@@ -423,11 +423,12 @@
   }
   
   .energy-input input {
-    flex: 1;
-    padding: 8px;
+    padding: 6px 8px;
     border: 1px solid #ddd;
     border-radius: 4px;
     font-size: 14px;
+    width: 60px;
+    text-align: left;
   }
   
   .energy-input label {

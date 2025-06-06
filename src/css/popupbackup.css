@@ -75,9 +75,17 @@
   
   .info-popup-content h4 {
     color: #333;
-    margin: 16px 0 8px 0;
+    margin: 25px 0 12px 0;
     font-size: 16px;
     font-weight: 600;
+    padding-top: 15px;
+    border-top: 1px solid #e0e0e0;
+  }
+
+  .info-popup-content h4:first-of-type {
+    border-top: none;
+    padding-top: 0;
+    margin-top: 20px;
   }
   
   .info-popup-content p {
@@ -102,4 +110,44 @@
   
   .highlight-box strong {
     color: #2196F3;
+  }
+  
+  .chart-container {
+    margin: 20px 0;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid #e9ecef;
+  }
+  
+  .chart-container svg {
+    display: block;
+    margin: 0 auto;
+    max-width: 100%;
+  }
+  
+  /* 차트 툴팁 스타일 */
+  .chart-tooltip {
+    position: absolute;
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    pointer-events: none;
+    z-index: 3000;
+  }
+  
+  .narrow-list-container {
+    width: 60%;
+    margin: 0 auto;
+  }
+  
+  .narrow-list-container ul {
+    margin: 8px 0 12px 0;
+    padding-left: 20px;
+  }
+  
+  .narrow-list-container li {
+    margin-bottom: 4px;
   } 

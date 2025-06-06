@@ -1,15 +1,18 @@
-import React, { useEffect, useRef, useCallback } from 'react';
+import React, { useEffect, useRef, useCallback, useState } from 'react';
 import * as d3 from 'd3';
 import { feature } from 'topojson-client';
 import InfoPopup from './PopupBackup';
+import PopupEnergyBudget from './PopupEnergyBudget';
 import '../css/korea.css';
 
 const Korea = ({ 
   currentYear,
+  setCurrentYear,
   world,
+  countriesData,
   koreaEnergySource,
   southKoreaEnergyAll,
-  southKoreaEnergyProduction,
+  southKoreaEnergyProperty,
   energyPrice,
   energyMixPercentages,
   setEnergyMixPercentages,
@@ -17,6 +20,8 @@ const Korea = ({
   setNeededEnergy,
   showInfoPopup,
   setShowInfoPopup,
+  showBudgetInfoPopup,
+  setShowBudgetInfoPopup,
   tooltipRef
 }) => {
   const koreaSmallMapRef = useRef();
@@ -24,6 +29,20 @@ const Korea = ({
   const koreaLineChartRef = useRef();
   const koreaStackedChartRef = useRef();
   const neededEnergyPieRef = useRef();
+
+  // 데이터 변환 함수 - NaN을 0으로 처리, 기타 제거
+  const convertPropertyData = useCallback(() => {
+    return Object.entries(southKoreaEnergyProperty).map(([year, data]) => ({
+      시점: parseInt(year),
+      화석연료: data.화력 || 0,
+      원자력: data.원자력 || 0,
+      신재생에너지: data['신재생 및 기타'] === 'NaN' ? 0 : (data['신재생 및 기타'] || 0),
+      수력: data.수력 || 0
+    }));
+  }, [southKoreaEnergyProperty]);
+
+  // 변환된 데이터 사용
+  const convertedPropertyData = convertPropertyData();
 
   // Korea visualizations effects
   useEffect(() => {
@@ -92,15 +111,15 @@ const Korea = ({
     const svg = d3.select(koreaPieChartRef.current);
     svg.selectAll("*").remove();
     
-    const yearData = southKoreaEnergyProduction.find(d => d.시점 === currentYear);
+    // 새로운 데이터 구조 사용 - 순서 변경
+    const yearData = convertedPropertyData.find(d => d.시점 === currentYear);
     if (!yearData) return;
     
     const data = [
+      { name: '화석연료', value: yearData.화석연료, color: '#ff7f0e' },
       { name: '원자력', value: yearData.원자력, color: '#1f77b4' },
       { name: '신재생에너지', value: yearData.신재생에너지, color: '#2ca02c' },
-      { name: '화석연료', value: yearData.화석연료, color: '#ff7f0e' },
-      { name: '수력', value: yearData.수력, color: '#17a2b8' },
-      { name: '기타', value: yearData.기타, color: '#9467bd' }
+      { name: '수력', value: yearData.수력, color: '#17a2b8' }
     ];
     
     const total = data.reduce((sum, d) => sum + d.value, 0);
@@ -138,6 +157,11 @@ const Korea = ({
       .style('cursor', 'pointer')
       .on('mouseover', function(event, d) {
         const percent = ((d.data.value / total) * 100).toFixed(1);
+        const originalValue = southKoreaEnergyProperty[currentYear]?.[
+          d.data.name === '신재생에너지' ? '신재생 및 기타' : 
+          d.data.name === '화석연료' ? '화력' : d.data.name
+        ];
+        
         if (tooltipRef.current) {
           const tooltip = d3.select(tooltipRef.current);
           tooltip.style('opacity', 1)
@@ -146,7 +170,7 @@ const Korea = ({
             .html(`
               <div><strong>${d.data.name}</strong></div>
               <div>비율: ${percent}%</div>
-              <div>실제값: ${d.data.value.toLocaleString()} (1000toe)</div>
+              <div>실제값: ${originalValue === 'NaN' ? 'NaN' : (d.data.value / 1000).toFixed(1)} TWh</div>
             `);
         }
       })
@@ -168,6 +192,14 @@ const Korea = ({
       });
   };
 
+  // South Korea 데이터를 countriesData에서 추출
+  const getSouthKoreaData = useCallback(() => {
+    const southKoreaCountry = Object.values(countriesData).find(country => 
+      country.name === 'South Korea'
+    );
+    return southKoreaCountry;
+  }, [countriesData]);
+
   const drawKoreaLineChart = () => {
     if (!koreaLineChartRef.current) return;
     
@@ -188,13 +220,27 @@ const Korea = ({
     const g = svg.append('g')
       .attr('transform', `translate(${margin.left}, ${margin.top})`);
     
-    const lineData = {
-      production: southKoreaEnergyAll.map(d => ({ year: d.시점, value: d.생산 })),
-      imports: southKoreaEnergyAll.map(d => ({ year: d.시점, value: d.순수입 })),
-      consumption: southKoreaEnergyAll.map(d => ({ year: d.시점, value: d.소비 }))
-    };
+    // World.js 데이터에서 South Korea 부분 사용
+    const southKoreaData = getSouthKoreaData();
+    if (!southKoreaData) return;
     
-    const years = southKoreaEnergyAll.map(d => d.시점);
+    // 연도별 데이터 추출
+    const years = Object.keys(southKoreaData.net_generation || {}).map(Number).sort();
+    
+    const lineData = {
+      production: years.map(year => ({ 
+        year: year, 
+        value: southKoreaData.net_generation?.[year] || 0 
+      })),
+      imports: years.map(year => ({ 
+        year: year, 
+        value: southKoreaData.imports?.[year] || 0 
+      })),
+      consumption: years.map(year => ({ 
+        year: year, 
+        value: southKoreaData.net_consumption?.[year] || 0 
+      }))
+    };
     
     const xScale = d3.scaleLinear()
       .domain(d3.extent(years))
@@ -235,10 +281,10 @@ const Korea = ({
       .style('text-anchor', 'middle')
       .style('font-size', '11px')
       .style('fill', '#666')
-      .text('Energy (1000toe)');
+      .text('Energy (TWh)');
     
     const colors = { production: '#2196F3', imports: '#e53e3e', consumption: '#666' };
-    const labels = { production: '생산', imports: '순수입', consumption: '소비' };
+    const labels = { production: '생산', imports: '수입', consumption: '소비' };
     
     // 선 그리기
     Object.keys(lineData).forEach(key => {
@@ -392,9 +438,10 @@ const Korea = ({
     const g = svg.append('g')
       .attr('transform', `translate(${margin.left}, ${margin.top})`);
     
-    const allData = southKoreaEnergyProduction;
-    const keys = ['원자력', '신재생에너지', '화석연료', '수력', '기타'];
-    const colors = ['#1f77b4', '#2ca02c', '#ff7f0e', '#17a2b8', '#9467bd'];
+    // 변환된 데이터 사용 - 순서 변경, 기타 제거
+    const allData = convertedPropertyData;
+    const keys = ['화석연료', '원자력', '신재생에너지', '수력'];
+    const colors = ['#ff7f0e', '#1f77b4', '#2ca02c', '#17a2b8'];
     
     const stack = d3.stack().keys(keys);
     const stackedData = stack(allData);
@@ -404,7 +451,7 @@ const Korea = ({
       .range([0, width])
       .padding(0.08);
     
-    const maxTotal = d3.max(allData, d => d.원자력 + d.신재생에너지 + d.화석연료 + d.수력 + d.기타);
+    const maxTotal = d3.max(allData, d => d.화석연료 + d.원자력 + d.신재생에너지 + d.수력);
     
     const yScale = d3.scaleLinear()
       .domain([0, maxTotal])
@@ -415,7 +462,9 @@ const Korea = ({
       .domain(keys)
       .range(colors);
     
-    g.append('g')
+    // 데이터 바들 먼저 그리기
+    const dataRects = g.append('g')
+      .attr('class', 'data-rects')
       .selectAll('g')
       .data(stackedData)
       .join('g')
@@ -431,35 +480,41 @@ const Korea = ({
       .on('mouseover', function(event, d) {
         const year = d.data.시점;
         const yearData = allData.find(item => item.시점 === year);
+        const originalData = southKoreaEnergyProperty[year];
         
-        g.selectAll('rect')
+        // 데이터 바들만 연하게 (범례 제외)
+        g.selectAll('.data-rects rect')
           .style('opacity', function() {
             const rectData = d3.select(this).datum();
             return rectData && rectData.data && rectData.data.시점 === year ? 1 : 0.3;
           });
         
-        if (tooltipRef.current && yearData) {
+        if (tooltipRef.current && yearData && originalData) {
           const tooltip = d3.select(tooltipRef.current);
           tooltip.style('opacity', 1)
             .style('left', (event.pageX + 10) + 'px')
             .style('top', (event.pageY - 10) + 'px')
             .html(`
-              <div><strong>${year}년 (단위: 1000toe)</strong></div>
-              <div>원자력: ${yearData.원자력.toLocaleString()}</div>
-              <div>신재생에너지: ${yearData.신재생에너지.toLocaleString()}</div>
-              <div>화석연료: ${yearData.화석연료.toLocaleString()}</div>
-              <div>수력: ${yearData.수력.toLocaleString()}</div>
-              <div>기타: ${yearData.기타.toLocaleString()}</div>
-              <div><strong>총합: ${(yearData.원자력 + yearData.신재생에너지 + yearData.화석연료 + yearData.수력 + yearData.기타).toLocaleString()}</strong></div>
+              <div><strong>${year}년 (단위: TWh)</strong></div>
+              <div>화석연료: ${originalData.화력 ? (originalData.화력 / 1000).toFixed(1) : 'N/A'}</div>
+              <div>원자력: ${originalData.원자력 ? (originalData.원자력 / 1000).toFixed(1) : 'N/A'}</div>
+              <div>신재생에너지: ${originalData['신재생 및 기타'] === 'NaN' ? 'NaN' : (originalData['신재생 및 기타'] ? (originalData['신재생 및 기타'] / 1000).toFixed(1) : 'N/A')}</div>
+              <div>수력: ${originalData.수력 ? (originalData.수력 / 1000).toFixed(1) : 'N/A'}</div>
+              <div><strong>총합: ${originalData.합계 ? (originalData.합계 / 1000).toFixed(1) : 'N/A'}</strong></div>
             `);
         }
       })
       .on('mouseout', () => {
-        g.selectAll('rect').style('opacity', 1);
+        // 데이터 바들만 원래대로 복원
+        g.selectAll('.data-rects rect').style('opacity', 1);
         
         if (tooltipRef.current) {
           d3.select(tooltipRef.current).style('opacity', 0);
         }
+      })
+      .on('click', function(event, d) {
+        const year = d.data.시점;
+        setCurrentYear(year);
       });
     
     g.append('g')
@@ -475,9 +530,10 @@ const Korea = ({
       .call(d3.axisLeft(yScale)
         .ticks(5)
         .tickFormat(d => {
-          if (d >= 1000000) return (d / 1000000).toFixed(0) + 'M';
-          if (d >= 1000) return (d / 1000).toFixed(0) + 'k';
-          return d;
+          const twh = d / 1000;  // GWh를 TWh로 변환
+          if (twh >= 1000) return (twh / 1000).toFixed(0) + 'P';
+          if (twh >= 1) return twh.toFixed(0);
+          return (twh * 1000).toFixed(0) + 'G';
         })
       )
       .selectAll('text')
@@ -490,10 +546,11 @@ const Korea = ({
       .style('text-anchor', 'middle')
       .style('font-size', '11px')
       .style('fill', '#666')
-      .text('Energy (1000toe)');
+      .text('Energy (TWh)');
     
+    // 범례는 별도 그룹으로 생성 (hover 영향 받지 않음)
     const legend = g.append('g')
-      .attr('class', 'legend')
+      .attr('class', 'chart-legend')
       .attr('transform', `translate(5, -25)`);
     
     keys.forEach((key, i) => {
@@ -532,12 +589,12 @@ const Korea = ({
     const svg = d3.select(neededEnergyPieRef.current);
     svg.selectAll("*").remove();
     
+    // 순서 변경, 기타 제거
     const data = [
+      { name: '화석연료', value: energyMixPercentages.fossil, color: '#ff7f0e' },
       { name: '원자력', value: energyMixPercentages.nuclear, color: '#1f77b4' },
       { name: '신재생', value: energyMixPercentages.renewable, color: '#2ca02c' },
-      { name: '화석연료', value: energyMixPercentages.fossil, color: '#ff7f0e' },
-      { name: '수력', value: energyMixPercentages.hydro, color: '#17a2b8' },
-      { name: '기타', value: energyMixPercentages.other, color: '#9467bd' }
+      { name: '수력', value: energyMixPercentages.hydro, color: '#17a2b8' }
     ];
     
     const viewBoxWidth = 200;
@@ -580,17 +637,18 @@ const Korea = ({
       .text(d => d.data.value >= 10 ? `${d.data.value.toFixed(1)}%` : '');
   };
 
-  // 퍼센트 정규화 함수
+  // 퍼센트 정규화 함수 수정 (기타 제거)
   const normalizePercentages = (changedType, newValue) => {
     const minValue = 0.1;
-    const maxValue = 99.6;
+    const maxValue = 99.7; // 다른 3개가 최소 0.1씩 가져야 하므로
     
     const clampedValue = Math.max(minValue, Math.min(maxValue, newValue));
     
     const newPercentages = { ...energyMixPercentages };
     newPercentages[changedType] = clampedValue;
     
-    const otherTypes = Object.keys(newPercentages).filter(type => type !== changedType);
+    // 기타 제거된 타입들만 처리
+    const otherTypes = ['nuclear', 'fossil', 'renewable', 'hydro'].filter(type => type !== changedType);
     const remainingTotal = 100 - clampedValue;
     const currentOtherTotal = otherTypes.reduce((sum, type) => sum + energyMixPercentages[type], 0);
     
@@ -625,29 +683,28 @@ const Korea = ({
     normalizePercentages(type, newValue);
   };
 
-  // 예산 계산 함수
+  // 예산 계산 함수 수정 - TWh로 입력받고 백만원/GWh 단가 적용
   const calculateBudget = () => {
     if (neededEnergy === 0) return '0';
     
-    const energyAmounts = {
-      nuclear: (neededEnergy * energyMixPercentages.nuclear) / 100,
-      fossil: (neededEnergy * energyMixPercentages.fossil) / 100,
-      renewable: (neededEnergy * energyMixPercentages.renewable) / 100,
-      hydro: (neededEnergy * energyMixPercentages.hydro) / 100,
-      other: (neededEnergy * energyMixPercentages.other) / 100
+    // neededEnergy는 이제 TWh 단위, 1 TWh = 1000 GWh
+    const energyAmountsInGWh = {
+      fossil: (neededEnergy * energyMixPercentages.fossil * 1000) / 100,
+      nuclear: (neededEnergy * energyMixPercentages.nuclear * 1000) / 100,
+      renewable: (neededEnergy * energyMixPercentages.renewable * 1000) / 100,
+      hydro: (neededEnergy * energyMixPercentages.hydro * 1000) / 100
     };
     
     const priceMapping = {
-      nuclear: energyPrice.원자력,
       fossil: energyPrice.화석연료,
+      nuclear: energyPrice.원자력,
       renewable: energyPrice.신재생,
-      hydro: energyPrice.수력,
-      other: energyPrice.기타
+      hydro: energyPrice.수력
     };
     
     let totalCost = 0;
-    Object.keys(energyAmounts).forEach(type => {
-      totalCost += energyAmounts[type] * priceMapping[type];
+    Object.keys(energyAmountsInGWh).forEach(type => {
+      totalCost += energyAmountsInGWh[type] * priceMapping[type];
     });
     
     return (totalCost / 100).toFixed(2);
@@ -665,40 +722,43 @@ const Korea = ({
             <h3>Energy Source</h3>
             <svg ref={koreaPieChartRef} id="korea-pie-chart"></svg>
             <div className="pie-legend">
+              <div className="legend-item"><span className="legend-color fossil"></span>화석연료</div>
               <div className="legend-item"><span className="legend-color nuclear"></span>원자력</div>
               <div className="legend-item"><span className="legend-color renewable"></span>신재생에너지</div>
-              <div className="legend-item"><span className="legend-color fossil"></span>화석연료</div>
               <div className="legend-item"><span className="legend-color hydro"></span>수력</div>
-              <div className="legend-item"><span className="legend-color other"></span>기타</div>
             </div>
           </div>
         </div>
         
         <div className="chart-section">
-          <h3 onClick={() => setShowInfoPopup(true)} style={{cursor: 'pointer', margin: '0 0 10px 0', color: '#333', fontSize: '15px', fontWeight: '600'}}>
+          <h3 style={{margin: '0 0 10px 0', color: '#333', fontSize: '15px', fontWeight: '600'}}>
             Energy Changes 
-            <svg 
-              viewBox="0 0 16 16" 
-              fill="none" 
-              xmlns="http://www.w3.org/2000/svg" 
-              style={{
-                width: '10px',
-                height: '10px', 
-                minWidth: '10px',
-                minHeight: '10px',
-                maxWidth: '10px',
-                maxHeight: '10px',
-                marginLeft: '6px', 
-                marginRight: '3px', 
-                verticalAlign: 'middle',
-                display: 'inline-block',
-                flexShrink: '0'
-              }}
+            <span 
+              onClick={() => setShowInfoPopup(true)}
+              style={{cursor: 'pointer', display: 'inline-flex', alignItems: 'center', marginLeft: '6px'}}
             >
-              <path d="M7.37516 11.9582H8.62512V7.16657H7.37516V11.9582ZM8.00014 5.74029C8.19085 5.74029 8.35071 5.67579 8.47971 5.54679C8.60871 5.41779 8.67321 5.25794 8.67321 5.06723C8.67321 4.87654 8.60871 4.71668 8.47971 4.58767C8.35071 4.45867 8.19085 4.39417 8.00014 4.39417C7.80943 4.39417 7.64958 4.45867 7.52058 4.58767C7.39158 4.71668 7.32708 4.87654 7.32708 5.06723C7.32708 5.25794 7.39158 5.41779 7.52058 5.54679C7.64958 5.67579 7.80943 5.74029 8.00014 5.74029ZM8.00154 15.9165C6.90659 15.9165 5.8774 15.7088 4.91396 15.2932C3.9505 14.8777 3.11243 14.3137 2.39975 13.6013C1.68705 12.889 1.12284 12.0513 0.7071 11.0882C0.291364 10.1252 0.0834961 9.09624 0.0834961 8.00129C0.0834961 6.90635 0.291274 5.87716 0.70683 4.91371C1.12239 3.95025 1.68634 3.11218 2.3987 2.3995C3.11108 1.68681 3.94878 1.12259 4.91181 0.706857C5.87482 0.291121 6.9038 0.083252 7.99875 0.083252C9.09369 0.083252 10.1229 0.291031 11.0863 0.706586C12.0498 1.12214 12.8879 1.6861 13.6005 2.39846C14.3132 3.11084 14.8774 3.94854 15.2932 4.91157C15.7089 5.87458 15.9168 6.90356 15.9168 7.9985C15.9168 9.09345 15.709 10.1226 15.2935 11.0861C14.8779 12.0495 14.3139 12.8876 13.6016 13.6003C12.8892 14.313 12.0515 14.8772 11.0885 15.2929C10.1255 15.7087 9.09648 15.9165 8.00154 15.9165ZM8.00014 14.6666C9.86125 14.6666 11.4376 14.0207 12.7293 12.7291C14.021 11.4374 14.6668 9.86101 14.6668 7.9999C14.6668 6.13879 14.021 4.5624 12.7293 3.27073C11.4376 1.97907 9.86125 1.33323 8.00014 1.33323C6.13903 1.33323 4.56264 1.97907 3.27098 3.27073C1.97931 4.5624 1.33348 6.13879 1.33348 7.9999C1.33348 9.86101 1.97931 11.4374 3.27098 12.7291C4.56264 14.0207 6.13903 14.6666 8.00014 14.6666Z" fill="#888888"/>
-            </svg>
-            <span style={{fontSize: '10px', color: '#888888', fontWeight: 'normal', marginLeft: '0px', display: 'inline', verticalAlign: 'middle'}}>
-              생산량이 소비량보다 많은 이유
+              <svg 
+                viewBox="0 0 16 16" 
+                fill="none" 
+                xmlns="http://www.w3.org/2000/svg" 
+                style={{
+                  width: '10px',
+                  height: '10px', 
+                  minWidth: '10px',
+                  minHeight: '10px',
+                  maxWidth: '10px',
+                  maxHeight: '10px',
+                  marginRight: '3px', 
+                  verticalAlign: 'middle',
+                  display: 'inline-block',
+                  flexShrink: '0'
+                }}
+              >
+                <path d="M7.37516 11.9582H8.62512V7.16657H7.37516V11.9582ZM8.00014 5.74029C8.19085 5.74029 8.35071 5.67579 8.47971 5.54679C8.60871 5.41779 8.67321 5.25794 8.67321 5.06723C8.67321 4.87654 8.60871 4.71668 8.47971 4.58767C8.35071 4.45867 8.19085 4.39417 8.00014 4.39417C7.80943 4.39417 7.64958 4.45867 7.52058 4.58767C7.39158 4.71668 7.32708 4.87654 7.32708 5.06723C7.32708 5.25794 7.39158 5.41779 7.52058 5.54679C7.64958 5.67579 7.80943 5.74029 8.00014 5.74029ZM8.00154 15.9165C6.90659 15.9165 5.8774 15.7088 4.91396 15.2932C3.9505 14.8777 3.11243 14.3137 2.39975 13.6013C1.68705 12.889 1.12284 12.0513 0.7071 11.0882C0.291364 10.1252 0.0834961 9.09624 0.0834961 8.00129C0.0834961 6.90635 0.291274 5.87716 0.70683 4.91371C1.12239 3.95025 1.68634 3.11218 2.3987 2.3995C3.11108 1.68681 3.94878 1.12259 4.91181 0.706857C5.87482 0.291121 6.9038 0.083252 7.99875 0.083252C9.09369 0.083252 10.1229 0.291031 11.0863 0.706586C12.0498 1.12214 12.8879 1.6861 13.6005 2.39846C14.3132 3.11084 14.8774 3.94854 15.2932 4.91157C15.7089 5.87458 15.9168 6.90356 15.9168 7.9985C15.9168 9.09345 15.709 10.1226 15.2935 11.0861C14.8779 12.0495 14.3139 12.8876 13.6016 13.6003C12.8892 14.313 12.0515 14.8772 11.0885 15.2929C10.1255 15.7087 9.09648 15.9165 8.00154 15.9165ZM8.00014 14.6666C9.86125 14.6666 11.4376 14.0207 12.7293 12.7291C14.021 11.4374 14.6668 9.86101 14.6668 7.9999C14.6668 6.13879 14.021 4.5624 12.7293 3.27073C11.4376 1.97907 9.86125 1.33323 8.00014 1.33323C6.13903 1.33323 4.56264 1.97907 3.27098 3.27073C1.97931 4.5624 1.33348 6.13879 1.33348 7.9999C1.33348 9.86101 1.97931 11.4374 3.27098 12.7291C4.56264 14.0207 6.13903 14.6666 8.00014 14.6666Z" fill="#888888"/>
+              </svg>
+              <span style={{fontSize: '10px', color: '#888888', fontWeight: 'normal', display: 'inline', verticalAlign: 'middle'}}>
+                생산량이 소비량보다 많은 이유
+              </span>
             </span>
           </h3>
           <svg ref={koreaLineChartRef} id="korea-line-chart"></svg>
@@ -710,38 +770,76 @@ const Korea = ({
         </div>
         
         <div className="chart-section energy-calculator">
-          <h3>Energy Budget Simulation</h3>
+          <h3 style={{margin: '0 0 10px 0', color: '#333', fontSize: '15px', fontWeight: '600'}}>
+            Energy Budget Simulation 
+            <span 
+              onClick={() => setShowBudgetInfoPopup(true)}
+              style={{cursor: 'pointer', display: 'inline-flex', alignItems: 'center', marginLeft: '6px'}}
+            >
+              <svg 
+                viewBox="0 0 16 16" 
+                fill="none" 
+                xmlns="http://www.w3.org/2000/svg" 
+                style={{
+                  width: '10px',
+                  height: '10px', 
+                  minWidth: '10px',
+                  minHeight: '10px',
+                  maxWidth: '10px',
+                  maxHeight: '10px',
+                  marginRight: '3px', 
+                  verticalAlign: 'middle',
+                  display: 'inline-block',
+                  flexShrink: '0'
+                }}
+              >
+                <path d="M7.37516 11.9582H8.62512V7.16657H7.37516V11.9582ZM8.00014 5.74029C8.19085 5.74029 8.35071 5.67579 8.47971 5.54679C8.60871 5.41779 8.67321 5.25794 8.67321 5.06723C8.67321 4.87654 8.60871 4.71668 8.47971 4.58767C8.35071 4.45867 8.19085 4.39417 8.00014 4.39417C7.80943 4.39417 7.64958 4.45867 7.52058 4.58767C7.39158 4.71668 7.32708 4.87654 7.32708 5.06723C7.32708 5.25794 7.39158 5.41779 7.52058 5.54679C7.64958 5.67579 7.80943 5.74029 8.00014 5.74029ZM8.00154 15.9165C6.90659 15.9165 5.8774 15.7088 4.91396 15.2932C3.9505 14.8777 3.11243 14.3137 2.39975 13.6013C1.68705 12.889 1.12284 12.0513 0.7071 11.0882C0.291364 10.1252 0.0834961 9.09624 0.0834961 8.00129C0.0834961 6.90635 0.291274 5.87716 0.70683 4.91371C1.12239 3.95025 1.68634 3.11218 2.3987 2.3995C3.11108 1.68681 3.94878 1.12259 4.91181 0.706857C5.87482 0.291121 6.9038 0.083252 7.99875 0.083252C9.09369 0.083252 10.1229 0.291031 11.0863 0.706586C12.0498 1.12214 12.8879 1.6861 13.6005 2.39846C14.3132 3.11084 14.8774 3.94854 15.2932 4.91157C15.7089 5.87458 15.9168 6.90356 15.9168 7.9985C15.9168 9.09345 15.709 10.1226 15.2935 11.0861C14.8779 12.0495 14.3139 12.8876 13.6016 13.6003C12.8892 14.313 12.0515 14.8772 11.0885 15.2929C10.1255 15.7087 9.09648 15.9165 8.00154 15.9165ZM8.00014 14.6666C9.86125 14.6666 11.4376 14.0207 12.7293 12.7291C14.021 11.4374 14.6668 9.86101 14.6668 7.9999C14.6668 6.13879 14.021 4.5624 12.7293 3.27073C11.4376 1.97907 9.86125 1.33323 8.00014 1.33323C6.13903 1.33323 4.56264 1.97907 3.27098 3.27073C1.97931 4.5624 1.33348 6.13879 1.33348 7.9999C1.33348 9.86101 1.97931 11.4374 3.27098 12.7291C4.56264 14.0207 6.13903 14.6666 8.00014 14.6666Z" fill="#888888"/>
+              </svg>
+              <span style={{fontSize: '10px', color: '#888888', fontWeight: 'normal', display: 'inline', verticalAlign: 'middle'}}>
+                발전 예산 시뮬레이션 사용법
+              </span>
+            </span>
+          </h3>
           <div className="calculator-content">
             <div className="energy-input">
               <label>Needed Energy: </label>
               <input 
                 type="number" 
                 id="needed-energy" 
-                placeholder="300000" 
+                placeholder="300" 
                 min="0"
+                step="1"
                 value={neededEnergy}
-                onChange={(e) => setNeededEnergy(parseInt(e.target.value) || 0)}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  if (value === '') {
+                    setNeededEnergy(0);
+                  } else {
+                    const parsedValue = parseFloat(value);
+                    if (!isNaN(parsedValue)) {
+                      setNeededEnergy(parsedValue);
+                    }
+                  }
+                }}
               />
-              <label>1000toe</label>
+              <label>TWh</label>
             </div>
             
             <div className="energy-controls">
               <div className="energy-sliders">
-                {['nuclear', 'renewable', 'fossil', 'hydro', 'other'].map((type) => {
+                {['fossil', 'nuclear', 'renewable', 'hydro'].map((type) => {
                   const value = energyMixPercentages[type];
                   const colors = {
+                    fossil: '#ff7f0e',
                     nuclear: '#1f77b4', 
                     renewable: '#2ca02c', 
-                    fossil: '#ff7f0e', 
-                    hydro: '#17a2b8', 
-                    other: '#9467bd' 
+                    hydro: '#17a2b8'
                   };
                   const labels = { 
+                    fossil: '화석연료',
                     nuclear: '원자력', 
                     renewable: '신재생', 
-                    fossil: '화석연료', 
-                    hydro: '수력', 
-                    other: '기타' 
+                    hydro: '수력'
                   };
                   
                   return (
@@ -756,7 +854,7 @@ const Korea = ({
                       <input 
                         type="range" 
                         min="0.1" 
-                        max="99.6" 
+                        max="99.7" 
                         step="0.1"
                         value={value}
                         onChange={(e) => handleSliderChange(type, e.target.value)}
@@ -782,6 +880,11 @@ const Korea = ({
       <InfoPopup 
         showPopup={showInfoPopup} 
         onClose={() => setShowInfoPopup(false)} 
+      />
+
+      <PopupEnergyBudget 
+        showPopup={showBudgetInfoPopup} 
+        onClose={() => setShowBudgetInfoPopup(false)} 
       />
     </div>
   );

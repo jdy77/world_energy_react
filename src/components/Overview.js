@@ -11,7 +11,7 @@ import countriesData from '../data/countries.js';
 import koreaEnergySource from '../data/json/korea_energy_source.json';
 import energyPrice from '../data/json/south_korea_energy_price_24_avg.json';
 import southKoreaEnergyAll from '../data/json/south_korea_energy_all.json';
-import southKoreaEnergyProduction from '../data/json/south_korea_energy_production.json';
+import southKoreaEnergyProperty from '../data/json/south_korea_energy_property.json';
 
 const Overview = () => {
   // State variables
@@ -22,14 +22,15 @@ const Overview = () => {
   const [detailCountry, setDetailCountry] = useState(null);
   const [showAllCountries, setShowAllCountries] = useState(false);
   const [energyMixPercentages, setEnergyMixPercentages] = useState({
-    nuclear: 6.0,
-    fossil: 12.0,
-    renewable: 71.0,
-    hydro: 1.0,
-    other: 10.0
+    fossil: 40.0,      // 화석연료
+    nuclear: 30.0,     // 원자력
+    renewable: 25.0,   // 신재생에너지
+    hydro: 5.0         // 수력
+    // 기타 제거, 총합 100%
   });
   const [neededEnergy, setNeededEnergy] = useState(300000);
   const [showInfoPopup, setShowInfoPopup] = useState(false);
+  const [showBudgetInfoPopup, setShowBudgetInfoPopup] = useState(false);
 
   // Tooltip ref
   const tooltipRef = useRef();
@@ -126,7 +127,7 @@ const Overview = () => {
     <div id="app-container">
       {/* Header with controls */}
       <header>
-        <h1>World Energy Data Explorer</h1>
+        <h1>World Electricity Data Explorer</h1>
         <div id="controls">
           <div id="year-control">
             <label htmlFor="year-slider">Year: <span id="year-value">{currentYear}</span></label>
@@ -174,10 +175,12 @@ const Overview = () => {
       {currentView === 'korea' && (
         <Korea
           currentYear={currentYear}
+          setCurrentYear={setCurrentYear}
           world={world}
+          countriesData={countriesData}
           koreaEnergySource={koreaEnergySource}
           southKoreaEnergyAll={southKoreaEnergyAll}
-          southKoreaEnergyProduction={southKoreaEnergyProduction}
+          southKoreaEnergyProperty={southKoreaEnergyProperty}
           energyPrice={energyPrice}
           energyMixPercentages={energyMixPercentages}
           setEnergyMixPercentages={setEnergyMixPercentages}
@@ -185,6 +188,8 @@ const Overview = () => {
           setNeededEnergy={setNeededEnergy}
           showInfoPopup={showInfoPopup}
           setShowInfoPopup={setShowInfoPopup}
+          showBudgetInfoPopup={showBudgetInfoPopup}
+          setShowBudgetInfoPopup={setShowBudgetInfoPopup}
           tooltipRef={tooltipRef}
         />
       )}
