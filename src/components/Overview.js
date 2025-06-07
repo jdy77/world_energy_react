@@ -20,7 +20,6 @@ const Overview = () => {
   const [currentView, setCurrentView] = useState('world'); // 'world' or 'korea'
   const [showDetailPanel, setShowDetailPanel] = useState(false);
   const [detailCountry, setDetailCountry] = useState(null);
-  const [showAllCountries, setShowAllCountries] = useState(false);
   const [energyMixPercentages, setEnergyMixPercentages] = useState({
     fossil: 40.0,      // 화석연료
     nuclear: 30.0,     // 원자력
@@ -139,16 +138,16 @@ const Overview = () => {
             <input 
               id="year-slider" 
               type="range" 
-              min="1980" 
-              max="2021" 
+              min="1990" 
+              max="2023" 
               value={currentYear} 
               step="1"
               onChange={handleYearChange}
               onInput={handleYearChange}
             />
             <div className="slider-labels">
-              <span>1980</span>
-              <span>2021</span>
+              <span>1990</span>
+              <span>2023</span>
             </div>
           </div>
           
@@ -171,8 +170,6 @@ const Overview = () => {
           globalMaxTradeBalance={globalMaxTradeBalance}
           globalMinTradeBalance={globalMinTradeBalance}
           getCountryData={getCountryData}
-          showAllCountries={showAllCountries}
-          setShowAllCountries={setShowAllCountries}
           handleCountryClick={handleCountryClick}
           tooltipRef={tooltipRef}
         />

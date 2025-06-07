@@ -33,23 +33,9 @@
     background: #f5f5f5;
   }
   
-  /* Left Panel - Map Side */
-  #left-panel {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    background: white;
-    border-right: 2px solid var(--border-color);
-  }
+
   
-  /* Right Panel - Horizontal Bar Chart */
-  #right-panel {
-    flex: 1;
-    background: var(--background-color);
-    display: flex;
-    flex-direction: column;
-    position: relative;
-  }
+
   
   #chart-header {
     padding: 1rem 2rem;
@@ -71,41 +57,46 @@
     margin: 0;
   }
   
-    #horizontal-chart-container {
-  flex: 1;
-  overflow-y: auto;
-  overflow-x: auto;
-  background: white;
-     padding: 10px;
-  height: 100%;
-  max-height: calc(100vh - 150px); /* Adjusted for header */
-     display: flex;
-     flex-direction: column;
-     align-items: center;
-     justify-content: flex-start;
-  /* Smooth scrolling for better UX */
-  scrollbar-width: thin;
-  scrollbar-color: #888 #f1f1f1;
-}
+      #horizontal-chart-container {
+    flex: 1;
+    overflow-y: hidden;
+    overflow-x: auto;
+    background: white;
+    padding: 15px;
+    width: calc(100% - 30px);
+    height: calc(100% - 30px);
+    /* Support horizontal scrolling for wide vertical chart */
+    display: block;
+    /* Enhanced scrolling for better UX */
+    scrollbar-width: thick;
+    scrollbar-color: #666 #f0f0f0;
+  }
 
-  /* Webkit scrollbar styling for better appearance */
+  /* Enhanced Webkit scrollbar styling for better visibility */
   #horizontal-chart-container::-webkit-scrollbar {
-    height: 12px;
-    width: 12px;
+    height: 16px;
+    width: 16px;
   }
 
   #horizontal-chart-container::-webkit-scrollbar-track {
-    background: #f1f1f1;
-    border-radius: 6px;
+    background: #f0f0f0;
+    border-radius: 8px;
+    border: 1px solid #e0e0e0;
   }
 
   #horizontal-chart-container::-webkit-scrollbar-thumb {
-    background: #888;
-    border-radius: 6px;
+    background: linear-gradient(45deg, #666, #888);
+    border-radius: 8px;
+    border: 2px solid #f0f0f0;
+    min-height: 20px;
   }
 
   #horizontal-chart-container::-webkit-scrollbar-thumb:hover {
-    background: #555;
+    background: linear-gradient(45deg, #444, #666);
+  }
+
+  #horizontal-chart-container::-webkit-scrollbar-thumb:active {
+    background: linear-gradient(45deg, #333, #555);
   }
   
   #horizontal-chart {
@@ -273,54 +264,62 @@
     padding-top: 70px;
   }
   
-  /* World view maintains flexible height */
+  /* World view - 3-section layout: upper-left map, upper-right empty, lower full-width chart */
   #world-view {
     min-height: 100vh;
     padding-top: 70px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    grid-template-areas: 
+      "upper-left upper-right"
+      "lower lower";
+    gap: 10px;
+    padding: 70px 10px 10px 10px;
   }
-  
-  /* Korea view allows content to expand with scroll */
-  #korea-view {
-    height: 100vh;
-    padding-top: 70px;
-    overflow-y: auto;
-    overflow-x: hidden;
-    box-sizing: border-box;
+
+  #upper-left-panel {
+    grid-area: upper-left;
+    display: flex;
+    flex-direction: column;
+    background: white;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
   }
-  
-  /* World view (기존 스타일 유지) */
-  #world-view #left-panel {
-    width: 50%;
-    min-height: calc(100vh - 70px);
+
+  #upper-right-panel {
+    grid-area: upper-right;
+    background: #f9f9f9;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #999;
+    font-style: italic;
   }
-  
-  #world-view #right-panel {
-    width: 50%;
-    min-height: calc(100vh - 70px);
-  }
-  
-  /* 지도는 원래대로 유지 */
+
   #map-section {
+    flex: 1;
     width: 100%;
-    min-height: calc(100vh - 70px);
+    height: 100%;
   }
-  
+
   #map {
     width: 100%;
-    min-height: calc(100vh - 70px);
+    height: 100%;
+  }
+
+  #lower-panel {
+    grid-area: lower;
+    display: flex;
+    flex-direction: column;
+    background: white;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
   }
   
-  /* horizontal-chart-container는 이미 올바르게 설정됨 */
-  #horizontal-chart-container {
-    width: 100%;
-    min-height: calc(100vh - 70px);
-  }
-  
-  /* horizontal-chart는 스크롤 가능하도록 높이 제한 제거 */
-  #horizontal-chart {
-    width: 100%;
-    min-width: 800px; /* Ensure minimum width for readability */
-  }
+
   
   /* Korea view layout */
   .korea-layout {
@@ -841,5 +840,14 @@
     font-size: 11px;
     color: #888888;
     font-weight: normal;
+  }
+  
+  /* Korea view allows content to expand with scroll */
+  #korea-view {
+    height: 100vh;
+    padding-top: 70px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    box-sizing: border-box;
   }
   
