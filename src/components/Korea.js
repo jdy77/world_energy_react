@@ -30,6 +30,24 @@ const Korea = ({
   const koreaStackedChartRef = useRef();
   const neededEnergyPieRef = useRef();
 
+  // State for tracking which info icons have been clicked
+  const [infoIconsClicked, setInfoIconsClicked] = useState({
+    energyChanges: false,
+    energyBudget: false
+  });
+
+  // Handler for info icon clicks
+  const handleInfoIconClick = (iconType, showPopupFunc) => {
+    // Mark this icon as clicked
+    setInfoIconsClicked(prev => ({
+      ...prev,
+      [iconType]: true
+    }));
+    
+    // Show the popup
+    showPopupFunc(true);
+  };
+
   // 데이터 변환 함수 - NaN을 0으로 처리, 기타 제거
   const convertPropertyData = useCallback(() => {
     return Object.entries(southKoreaEnergyProperty).map(([year, data]) => ({
@@ -207,8 +225,8 @@ const Korea = ({
     svg.selectAll("*").remove();
     
     const viewBoxWidth = 600;
-    const viewBoxHeight = 280;
-    const margin = { top: 15, right: 70, bottom: 35, left: 50 };
+    const viewBoxHeight = 380; // Further increased height to accommodate current year labels
+    const margin = { top: 15, right: 70, bottom: 115, left: 50 }; // Further increased bottom margin
     const width = viewBoxWidth - margin.left - margin.right;
     const height = viewBoxHeight - margin.top - margin.bottom;
     
@@ -341,7 +359,7 @@ const Korea = ({
       .style('stroke-dasharray', '3,3')
       .style('opacity', 0.8);
     
-    Object.keys(lineData).forEach(key => {
+    Object.keys(lineData).forEach((key, index) => {
       const circle = focus.append('circle')
         .attr('class', `circle-${key}`)
         .attr('r', 4)
@@ -349,13 +367,19 @@ const Korea = ({
         .style('stroke', 'white')
         .style('stroke-width', 2);
       
+      // Add background rectangle for text readability
+      const textBg = focus.append('rect')
+        .attr('class', `text-bg-${key}`)
+        .style('fill', 'rgba(255, 255, 255, 0.8)')
+        .style('stroke', 'none')
+        .attr('rx', 2);
+      
       const text = focus.append('text')
         .attr('class', `text-${key}`)
         .style('font-size', '11px')
         .style('font-weight', '600')
         .style('fill', colors[key])
-        .style('text-anchor', 'middle')
-        .attr('dy', '-8px');
+        .style('text-anchor', 'middle');
     });
     
     const yearText = focus.append('text')
@@ -364,7 +388,7 @@ const Korea = ({
       .style('font-weight', '600')
       .style('fill', '#333')
       .style('text-anchor', 'middle')
-      .attr('y', height + 15);
+      .attr('y', height + 35); 
     
     const mousemove = function(event) {
       const [mouseX] = d3.pointer(event);
@@ -388,22 +412,74 @@ const Korea = ({
         .attr('x', xScale(selectedYear))
         .text(selectedYear);
       
-      Object.keys(lineData).forEach((key, index) => {
-        const dataPoint = lineData[key].find(d => d.year === selectedYear);
-        if (dataPoint) {
-          const circle = focus.select(`.circle-${key}`);
-          const text = focus.select(`.text-${key}`);
-          
-          circle
-            .attr('cx', xScale(dataPoint.year))
-            .attr('cy', yScale(dataPoint.value));
-          
-          text
-            .attr('x', xScale(dataPoint.year))
-            .attr('y', yScale(dataPoint.value))
-            .text(`${dataPoint.value.toFixed(1)}`);
-        }
-      });
+             // Collect all data points for the selected year and sort by value
+       const allDataPoints = Object.keys(lineData).map((key, index) => {
+         const dataPoint = lineData[key].find(d => d.year === selectedYear);
+         return dataPoint ? { key, index, ...dataPoint } : null;
+       }).filter(d => d !== null).sort((a, b) => b.value - a.value);
+       
+       // Smart label positioning to avoid overlap
+       const labelHeight = 15;
+       const minLabelSpacing = 18;
+       const positions = [];
+       
+       allDataPoints.forEach((dataPoint, sortedIndex) => {
+         const circle = focus.select(`.circle-${dataPoint.key}`);
+         const text = focus.select(`.text-${dataPoint.key}`);
+         const textBg = focus.select(`.text-bg-${dataPoint.key}`);
+         
+         circle
+           .attr('cx', xScale(dataPoint.year))
+           .attr('cy', yScale(dataPoint.value));
+         
+         // Calculate optimal label position
+         let idealY = yScale(dataPoint.value) - 15;
+         
+         // Check for conflicts with existing labels
+         let finalY = idealY;
+         let attempts = 0;
+         while (attempts < 10) {
+           let hasConflict = false;
+           for (let pos of positions) {
+             if (Math.abs(finalY - pos) < minLabelSpacing) {
+               hasConflict = true;
+               break;
+             }
+           }
+           
+           if (!hasConflict) {
+             break;
+           }
+           
+           // Try positioning above and below the ideal position alternately
+           if (attempts % 2 === 0) {
+             finalY = idealY - ((attempts + 2) / 2) * minLabelSpacing;
+           } else {
+             finalY = idealY + ((attempts + 1) / 2) * minLabelSpacing;
+           }
+           attempts++;
+         }
+         
+         // Ensure labels stay within chart bounds (but can overlap with chart content)
+         finalY = Math.max(finalY, 5); // Don't go above chart
+         finalY = Math.min(finalY, height + 30); // Don't go too far below chart
+         
+         positions.push(finalY);
+         
+         const textContent = `${dataPoint.value.toFixed(1)}`;
+         text
+           .attr('x', xScale(dataPoint.year))
+           .attr('y', finalY)
+           .text(textContent);
+         
+         // Position and size background rectangle
+         const bbox = text.node().getBBox();
+         textBg
+           .attr('x', bbox.x - 2)
+           .attr('y', bbox.y - 1)
+           .attr('width', bbox.width + 4)
+           .attr('height', bbox.height + 2);
+       });
       
       focus.style('display', null);
     };
@@ -416,6 +492,66 @@ const Korea = ({
       .on('mouseover', () => focus.style('display', null))
       .on('mouseout', mouseout)
       .on('mousemove', mousemove);
+
+    // Add current year indicator
+    if (years.includes(currentYear)) {
+      // Vertical dotted line for current year
+      g.append('line')
+        .attr('class', 'current-year-indicator')
+        .attr('x1', xScale(currentYear))
+        .attr('x2', xScale(currentYear))
+        .attr('y1', 0)
+        .attr('y2', height)
+        .style('stroke', '#ff6b35')
+        .style('stroke-width', 2)
+        .style('stroke-dasharray', '4,4')
+        .style('opacity', 0.8);
+
+      // Current year values labels below x-axis
+      const currentYearData = {
+        production: lineData.production.find(d => d.year === currentYear),
+        imports: lineData.imports.find(d => d.year === currentYear),
+        consumption: lineData.consumption.find(d => d.year === currentYear)
+      };
+
+      const labelColors = { production: '#2196F3', imports: '#e53e3e', consumption: '#666' };
+      const labelTexts = { production: '생산', imports: '수입', consumption: '소비' };
+
+      // Position labels below x-axis
+      const labelStartY = height + 50; // Start below x-axis
+      const labelSpacing = 15; // Space between each label
+
+      Object.keys(currentYearData).forEach((key, index) => {
+        const data = currentYearData[key];
+        if (data) {
+          g.append('text')
+            .attr('class', 'current-year-label')
+            .attr('x', xScale(currentYear))
+            .attr('y', labelStartY + (index * labelSpacing))
+            .style('text-anchor', 'middle')
+            .style('font-size', '12px')
+            .style('font-weight', '600')
+            .style('fill', labelColors[key])
+            .text(`${currentYear}년 ${labelTexts[key]} : ${data.value.toFixed(1)}`);
+        }
+      });
+
+      // Add circle indicators on the lines for current year
+      Object.keys(currentYearData).forEach((key) => {
+        const data = currentYearData[key];
+        if (data) {
+          g.append('circle')
+            .attr('class', 'current-year-circle')
+            .attr('cx', xScale(data.year))
+            .attr('cy', yScale(data.value))
+            .attr('r', 5)
+            .style('fill', labelColors[key])
+            .style('stroke', 'white')
+            .style('stroke-width', 2)
+            .style('opacity', 0.9);
+        }
+      });
+    }
   };
 
   const drawKoreaStackedChart = () => {
@@ -732,12 +868,14 @@ const Korea = ({
         
         <div className="chart-section">
           <h3 style={{margin: '0 0 10px 0', color: '#333', fontSize: '15px', fontWeight: '600'}}>
-            Energy Changes 
+            Energy Supply & Demand Changes by Year
             <span 
-              onClick={() => setShowInfoPopup(true)}
-              style={{cursor: 'pointer', display: 'inline-flex', alignItems: 'center', marginLeft: '6px'}}
+              className={`info-icon-container ${!infoIconsClicked.energyChanges ? 'glow' : 'clicked'}`}
+              onClick={() => handleInfoIconClick('energyChanges', setShowInfoPopup)}
+              style={{cursor: 'pointer', display: 'inline-flex', alignItems: 'center', marginLeft: '10px'}}
             >
               <svg 
+                className="info-icon"
                 viewBox="0 0 16 16" 
                 fill="none" 
                 xmlns="http://www.w3.org/2000/svg" 
@@ -748,7 +886,7 @@ const Korea = ({
                   minHeight: '10px',
                   maxWidth: '10px',
                   maxHeight: '10px',
-                  marginRight: '3px', 
+                  marginRight: '1px', 
                   verticalAlign: 'middle',
                   display: 'inline-block',
                   flexShrink: '0'
@@ -756,7 +894,7 @@ const Korea = ({
               >
                 <path d="M7.37516 11.9582H8.62512V7.16657H7.37516V11.9582ZM8.00014 5.74029C8.19085 5.74029 8.35071 5.67579 8.47971 5.54679C8.60871 5.41779 8.67321 5.25794 8.67321 5.06723C8.67321 4.87654 8.60871 4.71668 8.47971 4.58767C8.35071 4.45867 8.19085 4.39417 8.00014 4.39417C7.80943 4.39417 7.64958 4.45867 7.52058 4.58767C7.39158 4.71668 7.32708 4.87654 7.32708 5.06723C7.32708 5.25794 7.39158 5.41779 7.52058 5.54679C7.64958 5.67579 7.80943 5.74029 8.00014 5.74029ZM8.00154 15.9165C6.90659 15.9165 5.8774 15.7088 4.91396 15.2932C3.9505 14.8777 3.11243 14.3137 2.39975 13.6013C1.68705 12.889 1.12284 12.0513 0.7071 11.0882C0.291364 10.1252 0.0834961 9.09624 0.0834961 8.00129C0.0834961 6.90635 0.291274 5.87716 0.70683 4.91371C1.12239 3.95025 1.68634 3.11218 2.3987 2.3995C3.11108 1.68681 3.94878 1.12259 4.91181 0.706857C5.87482 0.291121 6.9038 0.083252 7.99875 0.083252C9.09369 0.083252 10.1229 0.291031 11.0863 0.706586C12.0498 1.12214 12.8879 1.6861 13.6005 2.39846C14.3132 3.11084 14.8774 3.94854 15.2932 4.91157C15.7089 5.87458 15.9168 6.90356 15.9168 7.9985C15.9168 9.09345 15.709 10.1226 15.2935 11.0861C14.8779 12.0495 14.3139 12.8876 13.6016 13.6003C12.8892 14.313 12.0515 14.8772 11.0885 15.2929C10.1255 15.7087 9.09648 15.9165 8.00154 15.9165ZM8.00014 14.6666C9.86125 14.6666 11.4376 14.0207 12.7293 12.7291C14.021 11.4374 14.6668 9.86101 14.6668 7.9999C14.6668 6.13879 14.021 4.5624 12.7293 3.27073C11.4376 1.97907 9.86125 1.33323 8.00014 1.33323C6.13903 1.33323 4.56264 1.97907 3.27098 3.27073C1.97931 4.5624 1.33348 6.13879 1.33348 7.9999C1.33348 9.86101 1.97931 11.4374 3.27098 12.7291C4.56264 14.0207 6.13903 14.6666 8.00014 14.6666Z" fill="#888888"/>
               </svg>
-              <span style={{fontSize: '10px', color: '#888888', fontWeight: 'normal', display: 'inline', verticalAlign: 'middle'}}>
+              <span className="info-text" style={{fontSize: '10px', color: '#888888', fontWeight: 'normal', display: 'inline', verticalAlign: 'middle'}}>
                 생산량이 소비량보다 많은 이유
               </span>
             </span>
@@ -765,7 +903,7 @@ const Korea = ({
         </div>
         
         <div className="chart-section">
-          <h3>Energy Source Changes</h3>
+          <h3>Energy Source Changes by Year</h3>
           <svg ref={koreaStackedChartRef} id="korea-stacked-chart"></svg>
         </div>
         
@@ -773,10 +911,12 @@ const Korea = ({
           <h3 style={{margin: '0 0 10px 0', color: '#333', fontSize: '15px', fontWeight: '600'}}>
             Energy Budget Simulation 
             <span 
-              onClick={() => setShowBudgetInfoPopup(true)}
-              style={{cursor: 'pointer', display: 'inline-flex', alignItems: 'center', marginLeft: '6px'}}
+              className={`info-icon-container ${!infoIconsClicked.energyBudget ? 'glow' : 'clicked'}`}
+              onClick={() => handleInfoIconClick('energyBudget', setShowBudgetInfoPopup)}
+              style={{cursor: 'pointer', display: 'inline-flex', alignItems: 'center', marginLeft: '10px'}}
             >
               <svg 
+                className="info-icon"
                 viewBox="0 0 16 16" 
                 fill="none" 
                 xmlns="http://www.w3.org/2000/svg" 
@@ -787,7 +927,7 @@ const Korea = ({
                   minHeight: '10px',
                   maxWidth: '10px',
                   maxHeight: '10px',
-                  marginRight: '3px', 
+                  marginRight: '1px', 
                   verticalAlign: 'middle',
                   display: 'inline-block',
                   flexShrink: '0'
@@ -795,7 +935,7 @@ const Korea = ({
               >
                 <path d="M7.37516 11.9582H8.62512V7.16657H7.37516V11.9582ZM8.00014 5.74029C8.19085 5.74029 8.35071 5.67579 8.47971 5.54679C8.60871 5.41779 8.67321 5.25794 8.67321 5.06723C8.67321 4.87654 8.60871 4.71668 8.47971 4.58767C8.35071 4.45867 8.19085 4.39417 8.00014 4.39417C7.80943 4.39417 7.64958 4.45867 7.52058 4.58767C7.39158 4.71668 7.32708 4.87654 7.32708 5.06723C7.32708 5.25794 7.39158 5.41779 7.52058 5.54679C7.64958 5.67579 7.80943 5.74029 8.00014 5.74029ZM8.00154 15.9165C6.90659 15.9165 5.8774 15.7088 4.91396 15.2932C3.9505 14.8777 3.11243 14.3137 2.39975 13.6013C1.68705 12.889 1.12284 12.0513 0.7071 11.0882C0.291364 10.1252 0.0834961 9.09624 0.0834961 8.00129C0.0834961 6.90635 0.291274 5.87716 0.70683 4.91371C1.12239 3.95025 1.68634 3.11218 2.3987 2.3995C3.11108 1.68681 3.94878 1.12259 4.91181 0.706857C5.87482 0.291121 6.9038 0.083252 7.99875 0.083252C9.09369 0.083252 10.1229 0.291031 11.0863 0.706586C12.0498 1.12214 12.8879 1.6861 13.6005 2.39846C14.3132 3.11084 14.8774 3.94854 15.2932 4.91157C15.7089 5.87458 15.9168 6.90356 15.9168 7.9985C15.9168 9.09345 15.709 10.1226 15.2935 11.0861C14.8779 12.0495 14.3139 12.8876 13.6016 13.6003C12.8892 14.313 12.0515 14.8772 11.0885 15.2929C10.1255 15.7087 9.09648 15.9165 8.00154 15.9165ZM8.00014 14.6666C9.86125 14.6666 11.4376 14.0207 12.7293 12.7291C14.021 11.4374 14.6668 9.86101 14.6668 7.9999C14.6668 6.13879 14.021 4.5624 12.7293 3.27073C11.4376 1.97907 9.86125 1.33323 8.00014 1.33323C6.13903 1.33323 4.56264 1.97907 3.27098 3.27073C1.97931 4.5624 1.33348 6.13879 1.33348 7.9999C1.33348 9.86101 1.97931 11.4374 3.27098 12.7291C4.56264 14.0207 6.13903 14.6666 8.00014 14.6666Z" fill="#888888"/>
               </svg>
-              <span style={{fontSize: '10px', color: '#888888', fontWeight: 'normal', display: 'inline', verticalAlign: 'middle'}}>
+              <span className="info-text" style={{fontSize: '10px', color: '#888888', fontWeight: 'normal', display: 'inline', verticalAlign: 'middle'}}>
                 발전 예산 시뮬레이션 사용법
               </span>
             </span>

@@ -8,7 +8,7 @@
     --success-color: #27ae60;
     --warning-color: #e67e22;
   }
-  
+   
   * {
     margin: 0;
     padding: 0;
@@ -48,6 +48,7 @@
     background: var(--background-color);
     display: flex;
     flex-direction: column;
+    position: relative;
   }
   
   #chart-header {
@@ -70,21 +71,56 @@
     margin: 0;
   }
   
-  #horizontal-chart-container {
-    flex: 1;
-    overflow-y: auto;
-    overflow-x: hidden;
-    background: white;
-    padding: 0.5rem;
-    height: 100%;
-    max-height: calc(100vh - 70px);
+    #horizontal-chart-container {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: auto;
+  background: white;
+     padding: 10px;
+  height: 100%;
+  max-height: calc(100vh - 150px); /* Adjusted for header */
+     display: flex;
+     flex-direction: column;
+     align-items: center;
+     justify-content: flex-start;
+  /* Smooth scrolling for better UX */
+  scrollbar-width: thin;
+  scrollbar-color: #888 #f1f1f1;
+}
+
+  /* Webkit scrollbar styling for better appearance */
+  #horizontal-chart-container::-webkit-scrollbar {
+    height: 12px;
+    width: 12px;
+  }
+
+  #horizontal-chart-container::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 6px;
+  }
+
+  #horizontal-chart-container::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 6px;
+  }
+
+  #horizontal-chart-container::-webkit-scrollbar-thumb:hover {
+    background: #555;
   }
   
   #horizontal-chart {
     width: 100%;
+    min-width: 800px; /* Ensure minimum width for readability */
+    max-width: 100%;
+    height: auto;
+    display: block;
   }
   
   /* Chart specific styles */
+  .chart-axis-label {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+  }
+  
   .country-label {
     font-size: 9px;
     fill: var(--text-color);
@@ -92,14 +128,14 @@
   }
   
   .consumption-bar {
-    fill: #333;
-    fill-opacity: 0.8;
+    fill: #ffc107;
+    fill-opacity: 0.7;
     transition: all 0.2s ease;
   }
   
   .generation-bar {
     fill: #2196F3;
-    fill-opacity: 0.7;
+    fill-opacity: 0.8;
     transition: all 0.2s ease;
   }
   
@@ -111,7 +147,7 @@
   
   /* Highlighted bar styles */
   .consumption-bar.highlighted {
-    fill: #000;
+    fill: #ff9800;
     fill-opacity: 1;
     stroke: #fff;
     stroke-width: 1;
@@ -139,8 +175,13 @@
   }
   
   .chart-axis {
-    font-size: 8px;
-    fill: #666;
+    font-size: 11px;
+    fill: #333;
+  }
+  
+  .chart-axis text {
+    font-size: 11px;
+    fill: #333;
   }
   
   .chart-grid {
@@ -278,6 +319,7 @@
   /* horizontal-chart는 스크롤 가능하도록 높이 제한 제거 */
   #horizontal-chart {
     width: 100%;
+    min-width: 800px; /* Ensure minimum width for readability */
   }
   
   /* Korea view layout */
@@ -502,13 +544,13 @@
   
   /* Chart styling */
   .consumption-bar { 
-    fill: #333; 
-    fill-opacity: 0.3; 
+    fill: #ffc107; 
+    fill-opacity: 0.7; 
     transition: all 0.2s ease;
   }
   .generation-bar { 
     fill: #2196F3; 
-    fill-opacity: 0.7; 
+    fill-opacity: 0.8; 
     transition: all 0.2s ease;
   }
   .imports-bar { 
@@ -519,7 +561,7 @@
   
   /* Highlighted bar styles */
   .consumption-bar.highlighted { 
-    fill: #000; 
+    fill: #ff9800; 
     fill-opacity: 1; 
     stroke: #fff;
     stroke-width: 1;

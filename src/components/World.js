@@ -7,7 +7,8 @@ const World = ({
   currentYear, 
   countriesData, 
   world, 
-  globalMaxSelfSufficiency, 
+  globalMaxTradeBalance, 
+  globalMinTradeBalance,
   getCountryData,
   showAllCountries,
   setShowAllCountries,
@@ -52,37 +53,41 @@ const World = ({
     if (!mapRef.current) return;
     
     const svg = d3.select(mapRef.current);
-    const currentMetric = 'self_sufficiency_rate';
+    const currentMetric = 'trade_balance';
     
     // Collect all values for the current metric and year
     const values = [];
     Object.values(countriesData).forEach(country => {
       const value = country[currentMetric]?.[currentYear];
-      if (value != null && !isNaN(value)) {
-        values.push(value);
+      if (value != null && !isNaN(Number(value))) {
+        values.push(Number(value));
       }
     });
     
     if (values.length === 0) return;
     
-    // Create color scale for self-sufficiency rate
+    // Create color scale for trade balance (negative = imports, positive = exports)
     const colorScale = value => {
-      const redColor = "#d73027";
-      const yellowColor = "#fee08b";
-      const greenColor = "#1a9850";
+      const yellowColor = "#ffd700";     // Strong imports (negative values)
+      const lightYellowColor = "#ffeb80"; // Moderate imports
+      const whiteColor = "#ffffff";      // Neutral/balanced
+      const lightGreenColor = "#90ee90"; // Moderate exports
+      const greenColor = "#228b22";      // Strong exports (positive values)
       
-      if (value <= 100) {
+      if (value < 0) {
+        // Negative values (imports) - use yellow scale
         return d3.scaleLinear()
-          .domain([0, 100])
-          .range([redColor, yellowColor])
+          .domain([globalMinTradeBalance, 0])
+          .range([yellowColor, whiteColor])
           .interpolate(d3.interpolateHcl)
-          (value);
+          (Math.max(value, globalMinTradeBalance));
       } else {
+        // Positive values (exports) - use green scale
         return d3.scaleLinear()
-          .domain([100, globalMaxSelfSufficiency])
-          .range([yellowColor, greenColor])
+          .domain([0, globalMaxTradeBalance])
+          .range([whiteColor, greenColor])
           .interpolate(d3.interpolateHcl)
-          (Math.min(value, globalMaxSelfSufficiency));
+          (Math.min(value, globalMaxTradeBalance));
       }
     };
     
@@ -92,14 +97,24 @@ const World = ({
         const countryName = d.properties.name;
         const countryData = getCountryData(countryName);
         
-        if (!countryData || !countryData[currentMetric] || countryData[currentMetric][currentYear] == null) {
+        if (!countryData) {
+          // Country not in dataset at all - keep light grey
           return '#eee';
         }
         
-        const value = countryData[currentMetric][currentYear];
+        if (!countryData[currentMetric] || countryData[currentMetric][currentYear] == null) {
+          // Country exists in data but has N/A trade balance - darker grey
+          return '#999999';
+        }
+        
+        const value = Number(countryData[currentMetric][currentYear]);
+        if (isNaN(value)) {
+          // Country exists but trade balance value is invalid - darker grey
+          return '#999999';
+        }
         return colorScale(value);
       });
-  }, [currentYear, getCountryData, globalMaxSelfSufficiency]);
+  }, [currentYear, getCountryData, globalMaxTradeBalance, globalMinTradeBalance]);
 
   // Initialize horizontal chart
   useEffect(() => {
@@ -123,28 +138,28 @@ const World = ({
     
     if (!container) return;
     
-    const width = container.clientWidth || 800;
+    // Set minimum width to ensure chart readability with horizontal scroll
+    const containerWidth = container.clientWidth || 800;
+    const width = Math.max(containerWidth, 800); // Minimum width of 800px
     
     svg.selectAll("*").remove();
     
-    const margin = { top: 20, right: 120, bottom: 50, left: 150 };
+    const margin = { top: 40, right: 120, bottom: 80, left: 180 }; // Increased margins for better positioning
     const chartWidth = width - margin.left - margin.right;
     
     // Prepare data
     const allChartData = [];
     Object.values(countriesData).forEach(country => {
-      const generation = country.net_generation?.[currentYear];
-      const consumption = country.net_consumption?.[currentYear];
-      const imports = country.imports?.[currentYear];
+      const generation = Number(country.net_generation?.[currentYear]);
+      const consumption = Number(country.net_consumption?.[currentYear]);
+      const tradeBalance = Number(country.trade_balance?.[currentYear]);
       
-      if (generation != null && consumption != null && imports != null &&
-          !isNaN(generation) && !isNaN(consumption) && !isNaN(imports)) {
+      if (!isNaN(generation) && !isNaN(consumption) && !isNaN(tradeBalance)) {
         allChartData.push({
           country: country.name,
           generation: generation,
           consumption: consumption,
-          imports: imports,
-          total: generation + imports
+          tradeBalance: tradeBalance
         });
       }
     });
@@ -166,57 +181,55 @@ const World = ({
       return;
     }
     
-    // Calculate bar height
-    const barHeight = 8;
-    const barSpacing = 24;
+    // Calculate bar height for grouped bars - minimal gaps within countries
+    const barHeight = 12; // Width of each bar
+    const barSpacing = 28; // Space between countries (must be > barHeight*2 + groupSpacing)
+    const groupSpacing = 1; // Minimal space between generation and consumption bars (1px)
     
-    // 전체 차트 높이 계산
-    const totalChartHeight = chartData.length * barSpacing + margin.top + margin.bottom;
+    // Calculate total chart height with proper padding
+    const chartHeight = chartData.length * barSpacing;
+    const totalSvgHeight = chartHeight + margin.top + margin.bottom;
     
-    // SVG 높이를 항상 필요한 전체 높이로 설정
-    svg.attr('width', width).attr('height', totalChartHeight);
+    // Set SVG dimensions
+    svg.attr('width', width).attr('height', totalSvgHeight);
     
     // Create scales
-    const maxValue = d3.max(chartData, d => Math.max(d.consumption, d.total));
+    const maxValue = d3.max(chartData, d => Math.max(d.consumption, d.generation));
     const xScale = d3.scaleLinear()
       .domain([0, maxValue])
       .range([0, chartWidth]);
     
-    // Y 스케일을 일정한 간격으로 설정
-    const yScale = (i) => margin.top + i * barSpacing;
+    // Y scale function - position from top with proper spacing
+    const getYPosition = (index) => margin.top + (index * barSpacing);
     
     // Create chart group
     const chartGroup = svg.append('g')
       .attr('transform', `translate(${margin.left}, 0)`);
     
     // Add grid lines
-    const gridHeight = chartData.length * barSpacing;
     const xAxis = d3.axisBottom(xScale)
-      .ticks(5)
-      .tickSize(-gridHeight);
+      .ticks(6)
+      .tickSize(-chartHeight)
+      .tickFormat(d => d >= 1000 ? `${(d/1000).toFixed(0)}k` : d);
     
     chartGroup.append('g')
       .attr('class', 'chart-grid')
-      .attr('transform', `translate(0, ${margin.top + gridHeight})`)
+      .attr('transform', `translate(0, ${margin.top + chartHeight})`)
       .call(xAxis)
+      .selectAll('text')
+      .style('font-size', '10px')
+      .style('fill', '#666');
+    
+    // Remove grid line labels (keep only grid lines)
+    chartGroup.select('.chart-grid')
       .selectAll('text').remove();
     
-    // Draw bars
+    // Draw grouped bars for each country
     chartData.forEach((country, i) => {
-      const y = yScale(i);
+      const baseY = getYPosition(i);
       
-      // Consumption bar (background, gray)
-      chartGroup.append('rect')
-        .attr('class', 'consumption-bar')
-        .attr('data-country-index', i)
-        .attr('data-country-name', country.country)
-        .attr('x', 0)
-        .attr('y', y - 3)
-        .attr('width', xScale(country.consumption))
-        .attr('height', barHeight + 6)
-        .attr('fill', '#333')
-        .attr('fill-opacity', 0.3)
-        .style('cursor', 'pointer');
+      // Top bar: Generation - positioned above center
+      const generationY = baseY - (barHeight/2 + groupSpacing/2);
       
       // Generation bar (blue)
       chartGroup.append('rect')
@@ -224,101 +237,180 @@ const World = ({
         .attr('data-country-index', i)
         .attr('data-country-name', country.country)
         .attr('x', 0)
-        .attr('y', y)
+        .attr('y', generationY)
         .attr('width', xScale(country.generation))
         .attr('height', barHeight)
         .attr('fill', '#2196F3')
-        .attr('fill-opacity', 0.7)
-        .style('cursor', 'pointer');
+        .attr('fill-opacity', 0.8)
+        .style('cursor', 'pointer')
+        .on('mouseover', function(event, d) {
+          d3.select(this).classed('highlighted', true);
+          showBarTooltip(event, country, 'generation');
+        })
+        .on('mouseout', function() {
+          d3.select(this).classed('highlighted', false);
+          hideTooltip();
+        });
       
-      // Imports bar (red)
-      if (country.imports > 0) {
-        chartGroup.append('rect')
-          .attr('class', 'imports-bar')
+      // Trade balance arrow - starts from the end of generation bar
+      const tradeBalance = country.tradeBalance;
+      const generationEnd = xScale(country.generation);
+      const arrowY = generationY + barHeight/2; // Center vertically within the generation bar
+      const arrowThickness = barHeight * 0.6; // Arrow thickness (60% of bar height)
+      
+      if (tradeBalance !== 0 && !isNaN(tradeBalance)) {
+        const arrowLength = xScale(Math.abs(tradeBalance));
+        const arrowColor = tradeBalance > 0 ? '#228b22' : '#ffd700'; // Green for exports, yellow for imports
+        const arrowDirection = tradeBalance > 0 ? 1 : -1; // Right for positive, left for negative
+        
+        // Arrow shaft (horizontal line)
+        chartGroup.append('line')
+          .attr('class', 'trade-arrow-shaft')
           .attr('data-country-index', i)
           .attr('data-country-name', country.country)
-          .attr('x', xScale(country.generation))
-          .attr('y', y)
-          .attr('width', xScale(country.imports))
-          .attr('height', barHeight)
-          .attr('fill', '#e53e3e')
-          .attr('fill-opacity', 0.8)
-          .style('cursor', 'pointer');
+          .attr('x1', generationEnd)
+          .attr('y1', arrowY)
+          .attr('x2', generationEnd + (arrowLength * arrowDirection))
+          .attr('y2', arrowY)
+          .attr('stroke', arrowColor)
+          .attr('stroke-width', arrowThickness * 0.4)
+          .style('cursor', 'pointer')
+          .on('mouseover', function(event, d) {
+            d3.select(this).attr('stroke-width', arrowThickness * 0.5);
+            showBarTooltip(event, country, 'trade');
+          })
+          .on('mouseout', function() {
+            d3.select(this).attr('stroke-width', arrowThickness * 0.4);
+            hideTooltip();
+          });
+        
+        // Arrow head (triangle)
+        const headSize = arrowThickness * 0.5;
+        const arrowHeadX = generationEnd + (arrowLength * arrowDirection);
+        const arrowHeadPoints = tradeBalance > 0 
+          ? `${arrowHeadX},${arrowY} ${arrowHeadX - headSize},${arrowY - headSize/2} ${arrowHeadX - headSize},${arrowY + headSize/2}`
+          : `${arrowHeadX},${arrowY} ${arrowHeadX + headSize},${arrowY - headSize/2} ${arrowHeadX + headSize},${arrowY + headSize/2}`;
+        
+        chartGroup.append('polygon')
+          .attr('class', 'trade-arrow-head')
+          .attr('data-country-index', i)
+          .attr('data-country-name', country.country)
+          .attr('points', arrowHeadPoints)
+          .attr('fill', arrowColor)
+          .style('cursor', 'pointer')
+          .on('mouseover', function(event, d) {
+            d3.select(this).attr('fill-opacity', 0.8);
+            showBarTooltip(event, country, 'trade');
+          })
+          .on('mouseout', function() {
+            d3.select(this).attr('fill-opacity', 1);
+            hideTooltip();
+          });
       }
+      
+      // Bottom bar: Consumption - positioned below center
+      const consumptionY = baseY + (barHeight/2 + groupSpacing/2);
+      
+      chartGroup.append('rect')
+        .attr('class', 'consumption-bar')
+        .attr('data-country-index', i)
+        .attr('data-country-name', country.country)
+        .attr('x', 0)
+        .attr('y', consumptionY)
+        .attr('width', xScale(country.consumption))
+        .attr('height', barHeight)
+        .attr('fill', '#ffc107')
+        .attr('fill-opacity', 0.7)
+        .style('cursor', 'pointer')
+        .on('mouseover', function(event, d) {
+          d3.select(this).classed('highlighted', true);
+          showBarTooltip(event, country, 'consumption');
+        })
+        .on('mouseout', function() {
+          d3.select(this).classed('highlighted', false);
+          hideTooltip();
+        });
     });
     
-    // Add country labels
+    // Add country labels (centered between grouped bars)
     chartData.forEach((country, i) => {
+      const baseY = getYPosition(i);
+      
       chartGroup.append('text')
         .attr('class', 'country-label')
         .attr('data-country-name', country.country)
-        .attr('x', -5)
-        .attr('y', yScale(i) + barHeight / 2)
+        .attr('x', -10)
+        .attr('y', baseY + barHeight/2) // Center vertically between the grouped bars
         .attr('text-anchor', 'end')
         .attr('alignment-baseline', 'middle')
-        .style('font-size', '9px')
+        .style('font-size', '10px')
         .style('fill', '#333')
         .style('cursor', 'pointer')
-        .text(country.country);
+        .text(country.country.length > 15 ? country.country.substring(0, 15) + '...' : country.country);
     });
     
-    // Add x-axis
-    const axisY = margin.top + gridHeight;
+    // Add x-axis at bottom
+    const axisY = margin.top + chartHeight;
     chartGroup.append('g')
       .attr('class', 'chart-axis')
       .attr('transform', `translate(0, ${axisY})`)
-      .call(d3.axisBottom(xScale).ticks(5));
+      .call(d3.axisBottom(xScale)
+        .ticks(6)
+        .tickFormat(d => d >= 1000 ? `${(d/1000).toFixed(0)}k` : d))
+      .selectAll('text')
+      .style('font-size', '11px')
+      .style('fill', '#333');
     
     // Add x-axis label
     chartGroup.append('text')
-      .attr('class', 'chart-axis')
+      .attr('class', 'chart-axis-label')
       .attr('x', chartWidth / 2)
-      .attr('y', axisY + 35)
+      .attr('y', axisY + 50)
       .attr('text-anchor', 'middle')
-      .style('font-size', '12px')
+      .style('font-size', '13px')
       .style('font-weight', '600')
+      .style('fill', '#333')
       .text('Energy (TWh)');
     
-    // Add legend
+    // Add legend - positioned at top right
     const legend = svg.append('g')
-      .attr('transform', `translate(${width - 110}, 15)`);
+      .attr('transform', `translate(${width - 110}, 20)`);
     
     const legendData = [
-      { label: 'Consumption', color: '#333', opacity: 0.3 },
-      { label: 'Generation', color: '#2196F3', opacity: 0.7 },
-      { label: 'Imports', color: '#e53e3e', opacity: 0.8 }
+      { label: 'Generation', color: '#2196F3', opacity: 0.8 },
+      { label: 'Consumption', color: '#ffc107', opacity: 0.7 }
     ];
     
     legendData.forEach((item, i) => {
       const legendItem = legend.append('g')
-        .attr('transform', `translate(0, ${i * 15})`);
+        .attr('transform', `translate(0, ${i * 18})`);
       
       legendItem.append('rect')
-        .attr('width', 10)
-        .attr('height', 10)
+        .attr('width', 12)
+        .attr('height', 12)
         .attr('fill', item.color)
         .attr('fill-opacity', item.opacity);
       
       legendItem.append('text')
-        .attr('x', 15)
-        .attr('y', 8)
-        .style('font-size', '11px')
+        .attr('x', 16)
+        .attr('y', 9)
+        .style('font-size', '12px')
         .style('fill', '#333')
         .text(item.label);
     });
     
-    // Add toggle button
+    // Add toggle button - positioned at top right, below legend
     const buttonWidth = 130;
-    const buttonX = Math.min(width - buttonWidth - 10, width - 140);
+    const buttonX = width - buttonWidth - 10;
     
     const buttonGroup = svg.append('g')
-      .attr('transform', `translate(${buttonX}, 70)`);
+      .attr('transform', `translate(${buttonX}, 80)`);
     
     buttonGroup.append('rect')
       .attr('class', 'toggle-button')
       .attr('width', buttonWidth)
-      .attr('height', 25)
-      .attr('rx', 3)
+      .attr('height', 30)
+      .attr('rx', 4)
       .attr('fill', '#f0f0f0')
       .attr('stroke', '#ccc')
       .attr('stroke-width', 1)
@@ -330,15 +422,44 @@ const World = ({
     buttonGroup.append('text')
       .attr('class', 'toggle-button-text')
       .attr('x', buttonWidth / 2)
-      .attr('y', 16) 
+      .attr('y', 20) 
       .attr('text-anchor', 'middle')
       .attr('alignment-baseline', 'middle')
-      .style('font-size', '10px')
+      .style('font-size', '11px')
       .style('font-weight', '600')
       .style('fill', '#333')
       .style('cursor', 'pointer')
       .text(showAllCountries ? 'Show Top 30' : 'Show All Countries')
       .on('click', () => setShowAllCountries(!showAllCountries));
+
+    // Tooltip functions
+    function showBarTooltip(event, country, type) {
+      if (!tooltipRef.current) return;
+      
+      const tooltip = d3.select(tooltipRef.current);
+      let content = `<div><strong>${country.country}</strong></div>`;
+      
+      if (type === 'generation') {
+        content += `<div>Generation: ${country.generation.toFixed(1)} TWh</div>`;
+      } else if (type === 'consumption') {
+        content += `<div>Consumption: ${country.consumption.toFixed(1)} TWh</div>`;
+      } else if (type === 'trade') {
+        const tradeType = country.tradeBalance > 0 ? 'Net Exports' : 'Net Imports';
+        content += `<div>${tradeType}: ${Math.abs(country.tradeBalance).toFixed(1)} TWh</div>`;
+        content += `<div>Trade Balance: ${country.tradeBalance.toFixed(1)} TWh</div>`;
+      }
+      
+      tooltip.style('opacity', 1)
+        .style('left', (event.pageX + 10) + 'px')
+        .style('top', (event.pageY - 10) + 'px')
+        .html(content);
+    }
+    
+    function hideTooltip() {
+      if (tooltipRef.current) {
+        d3.select(tooltipRef.current).style('opacity', 0);
+      }
+    }
       
   }, [currentYear, showAllCountries, getCountryData]);
 
@@ -349,14 +470,15 @@ const World = ({
     if (tooltipRef.current) {
       const tooltip = d3.select(tooltipRef.current);
       if (countryData) {
-        const selfSufficiency = countryData.self_sufficiency_rate?.[currentYear];
+        const tradeBalanceValue = countryData.trade_balance?.[currentYear];
+        const tradeBalance = (tradeBalanceValue != null && !isNaN(Number(tradeBalanceValue))) ? Number(tradeBalanceValue) : null;
         
         tooltip.style('opacity', 1)
           .style('left', (event.pageX + 10) + 'px')
           .style('top', (event.pageY - 10) + 'px')
           .html(`
             <div><strong>${countryName}</strong></div>
-            <div>Self-Sufficiency: ${selfSufficiency ? selfSufficiency.toFixed(1) + '%' : 'N/A'}</div>
+            <div>Trade Balance: ${tradeBalance !== null ? tradeBalance.toFixed(1) + ' TWh' : 'N/A'}</div>
           `);
       } else {
         tooltip.style('opacity', 1)

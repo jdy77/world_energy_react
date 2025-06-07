@@ -35,20 +35,25 @@ const Overview = () => {
   // Tooltip ref
   const tooltipRef = useRef();
 
-  // Calculate global maximum self-sufficiency rate
-  const globalMaxSelfSufficiency = React.useMemo(() => {
-    let max = 0;
+  // Calculate global maximum and minimum trade balance values
+  const globalTradeBalanceRange = React.useMemo(() => {
+    let max = -Infinity;
+    let min = Infinity;
     Object.values(countriesData).forEach(country => {
-      if (country.self_sufficiency_rate) {
-        Object.values(country.self_sufficiency_rate).forEach(value => {
-          if (!isNaN(value) && value > max) {
-            max = value;
+      if (country.trade_balance) {
+        Object.values(country.trade_balance).forEach(value => {
+          if (!isNaN(value)) {
+            if (value > max) max = value;
+            if (value < min) min = value;
           }
         });
       }
     });
-    return Math.ceil(max / 100) * 100;
+    return { max, min };
   }, []);
+
+  const globalMaxTradeBalance = globalTradeBalanceRange.max;
+  const globalMinTradeBalance = globalTradeBalanceRange.min;
 
   // Create country name mapping
   const countryNameToData = React.useMemo(() => {
@@ -163,7 +168,8 @@ const Overview = () => {
           currentYear={currentYear}
           countriesData={countriesData}
           world={world}
-          globalMaxSelfSufficiency={globalMaxSelfSufficiency}
+          globalMaxTradeBalance={globalMaxTradeBalance}
+          globalMinTradeBalance={globalMinTradeBalance}
           getCountryData={getCountryData}
           showAllCountries={showAllCountries}
           setShowAllCountries={setShowAllCountries}
@@ -200,7 +206,7 @@ const Overview = () => {
           <button id="close-detail" onClick={closeDetailPanel}>×</button>
           <h2 id="country-name">{detailCountry.name}</h2>
           <div className="chart-container">
-            <h3>Self-Sufficiency Trend</h3>
+            <h3>Trade Balance Trend</h3>
             <div id="bar-chart"></div>
           </div>
           <div className="data-summary">
@@ -209,33 +215,42 @@ const Overview = () => {
               <div className="stat-item">
                 <span className="stat-label">Generation</span>
                 <span className="stat-value">
-                  {detailCountry.data.net_generation?.[currentYear] 
-                    ? `${detailCountry.data.net_generation[currentYear].toLocaleString()} TWh` 
-                    : '-'}
+                  {(() => {
+                    const generationValue = detailCountry.data.net_generation?.[currentYear];
+                    const generation = (generationValue != null && !isNaN(Number(generationValue))) ? Number(generationValue) : null;
+                    return generation !== null ? `${generation.toLocaleString()} TWh` : '-';
+                  })()}
                 </span>
               </div>
               <div className="stat-item">
                 <span className="stat-label">Consumption</span>
                 <span className="stat-value">
-                  {detailCountry.data.net_consumption?.[currentYear] 
-                    ? `${detailCountry.data.net_consumption[currentYear].toLocaleString()} TWh` 
-                    : '-'}
+                  {(() => {
+                    const consumptionValue = detailCountry.data.net_consumption?.[currentYear];
+                    const consumption = (consumptionValue != null && !isNaN(Number(consumptionValue))) ? Number(consumptionValue) : null;
+                    return consumption !== null ? `${consumption.toLocaleString()} TWh` : '-';
+                  })()}
                 </span>
               </div>
               <div className="stat-item">
-                <span className="stat-label">Imports</span>
+                <span className="stat-label">Trade Balance</span>
                 <span className="stat-value">
-                  {detailCountry.data.imports?.[currentYear] 
-                    ? `${detailCountry.data.imports[currentYear].toLocaleString()} TWh` 
-                    : '-'}
+                  {(() => {
+                    const tradeBalanceValue = detailCountry.data.trade_balance?.[currentYear];
+                    const tradeBalance = (tradeBalanceValue != null && !isNaN(Number(tradeBalanceValue))) ? Number(tradeBalanceValue) : null;
+                    return tradeBalance !== null ? `${tradeBalance.toFixed(1)} TWh` : '-';
+                  })()}
                 </span>
               </div>
               <div className="stat-item">
-                <span className="stat-label">Self-Sufficiency</span>
+                <span className="stat-label">Status</span>
                 <span className="stat-value">
-                  {detailCountry.data.self_sufficiency_rate?.[currentYear] 
-                    ? `${detailCountry.data.self_sufficiency_rate[currentYear].toFixed(1)}%` 
-                    : '-'}
+                  {(() => {
+                    const tradeBalanceValue = detailCountry.data.trade_balance?.[currentYear];
+                    const tradeBalance = (tradeBalanceValue != null && !isNaN(Number(tradeBalanceValue))) ? Number(tradeBalanceValue) : null;
+                    if (tradeBalance === null) return '-';
+                    return tradeBalance > 0 ? 'Net Exporter' : tradeBalance < 0 ? 'Net Importer' : 'Balanced';
+                  })()}
                 </span>
               </div>
             </div>
