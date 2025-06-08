@@ -26,18 +26,27 @@ const World = ({
     if (!mapRef.current) return;
     
     const svg = d3.select(mapRef.current);
-    const width = svg.node().clientWidth || 800;
-    const height = svg.node().clientHeight || 500;
+    const container = svg.node().parentElement;
+    
+    if (!container) return;
+    
+    const containerWidth = container.clientWidth;
+    const containerHeight = container.clientHeight;
+    const width = containerWidth;
+    const height = containerHeight;
     
     svg.selectAll("*").remove(); // Clear previous content
+    svg.attr('width', width).attr('height', height);
     
-    const projection = d3.geoNaturalEarth1().fitSize([width, height], feature(world, world.objects.countries));
+    const projection = d3.geoNaturalEarth1().fitSize([width - 20, height - 20], feature(world, world.objects.countries));
     const path = d3.geoPath(projection);
     
     const land = feature(world, world.objects.countries);
     
-    svg.append('g')
-      .selectAll('path')
+    const mapGroup = svg.append('g')
+      .attr('transform', 'translate(10, 10)');
+    
+    mapGroup.selectAll('path')
       .data(land.features)
       .join('path')
       .attr('d', path)
@@ -95,7 +104,7 @@ const World = ({
     };
     
     // Update country colors
-    svg.selectAll('path')
+    svg.select('g').selectAll('path')
       .attr('fill', d => {
         const countryName = d.properties.name;
         const countryData = getCountryData(countryName);
@@ -142,16 +151,16 @@ const World = ({
     if (!container) return;
     
     // Set dimensions for vertical bar chart
-    const containerWidth = container.clientWidth || 1200;
-    const containerHeight = container.clientHeight || 300;
-    const width = Math.max(containerWidth - 40, 1200);
-    const height = Math.max(containerHeight - 40, 300);
+    const containerWidth = container.clientWidth;
+    const containerHeight = container.clientHeight;
+    const width = containerWidth;
+    const height = containerHeight;
     
     svg.selectAll("*").remove();
     
-    const margin = { top: 40, right: 40, bottom: 140, left: 80 };
+    const margin = { top: 10, right: 25, bottom: 45, left: 40 };
     const chartWidth = width - margin.left - margin.right;
-    const chartHeight = height - margin.top - margin.bottom;
+    const chartHeight = Math.min(height - margin.top - margin.bottom, 400); // Cap max height at 400px (doubled)
     
     // Prepare data - include ALL countries (no filtering)
     const allChartData = [];
@@ -215,7 +224,7 @@ const World = ({
     
     // Add grid lines (horizontal)
     const yAxis = d3.axisLeft(yScale)
-      .ticks(8)
+      .ticks(4)
       .tickSize(-chartWidth)
       .tickFormat(d => d >= 1000 ? `${(d/1000).toFixed(0)}k` : d);
     
@@ -223,7 +232,7 @@ const World = ({
       .attr('class', 'chart-grid')
       .call(yAxis)
       .selectAll('text')
-      .style('font-size', '10px')
+      .style('font-size', '8px')
       .style('fill', '#666');
     
     // Remove grid line labels (keep only grid lines)
@@ -345,7 +354,7 @@ const World = ({
     
     // Style the x-axis text
     xAxisGroup.selectAll('text')
-      .style('font-size', '8px')
+      .style('font-size', '6px')
       .style('fill', '#333')
       .attr('transform', 'rotate(-45)')
       .style('text-anchor', 'end');
@@ -354,7 +363,7 @@ const World = ({
     chartData.forEach((country, i) => {
       const xPos = xScale(country.country);
       const isSelected = selectedCountries.includes(country.country);
-      const buttonY = chartHeight + 30; // Position below the country names
+      const buttonY = chartHeight + 10; // Position below the country names
       
       // Create a button group to handle all events together
       const buttonGroup = chartGroup.append('g')
@@ -369,21 +378,21 @@ const World = ({
         .attr('x', xPos - 5)
         .attr('y', buttonY)
         .attr('width', xScale.bandwidth() + 10)
-        .attr('height', 25)
+        .attr('height', 18)
         .attr('fill', isSelected ? '#4CAF50' : '#666666')
         .attr('fill-opacity', isSelected ? 1.0 : 0.1)
         .attr('stroke', isSelected ? '#2E7D32' : '#999')
         .attr('stroke-opacity', isSelected ? 1.0 : 0.3)
         .attr('stroke-width', 1)
-        .attr('rx', 4);
+        .attr('rx', 3);
       
       // Add selection button text
       const buttonText = buttonGroup.append('text')
         .attr('class', 'country-selector-text')
         .attr('x', xPos + xScale.bandwidth() / 2)
-        .attr('y', buttonY + 16)
+        .attr('y', buttonY + 12)
         .attr('text-anchor', 'middle')
-        .style('font-size', '10px')
+        .style('font-size', '8px')
         .style('font-weight', '700')
         .style('fill', isSelected ? 'white' : '#666')
         .style('pointer-events', 'none')
@@ -433,16 +442,16 @@ const World = ({
       .attr('class', 'chart-axis-label')
       .attr('transform', 'rotate(-90)')
       .attr('x', -chartHeight / 2)
-      .attr('y', -50)
+      .attr('y', -28)
       .attr('text-anchor', 'middle')
-      .style('font-size', '13px')
+      .style('font-size', '9px')
       .style('font-weight', '600')
       .style('fill', '#333')
       .text('Energy (TWh)');
     
     // Add legend - positioned at top right
     const legend = svg.append('g')
-      .attr('transform', `translate(${width - 140}, 20)`);
+      .attr('transform', `translate(${width - 100}, 10)`);
     
     const legendData = [
       { label: 'Generation', color: '#2196F3', opacity: 0.8 },
@@ -451,18 +460,18 @@ const World = ({
     
     legendData.forEach((item, i) => {
       const legendItem = legend.append('g')
-        .attr('transform', `translate(0, ${i * 18})`);
+        .attr('transform', `translate(0, ${i * 12})`);
       
       legendItem.append('rect')
-        .attr('width', 12)
-        .attr('height', 12)
+        .attr('width', 8)
+        .attr('height', 8)
         .attr('fill', item.color)
         .attr('fill-opacity', item.opacity);
       
       legendItem.append('text')
-        .attr('x', 16)
-        .attr('y', 9)
-        .style('font-size', '12px')
+        .attr('x', 12)
+        .attr('y', 7)
+        .style('font-size', '9px')
         .style('fill', '#333')
         .text(item.label);
     });

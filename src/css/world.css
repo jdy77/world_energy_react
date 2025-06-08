@@ -59,12 +59,10 @@
   
       #horizontal-chart-container {
     flex: 1;
-    overflow-y: hidden;
+    overflow-y: auto;
     overflow-x: auto;
-    background: white;
-    padding: 15px;
-    width: calc(100% - 30px);
-    height: calc(100% - 30px);
+    min-height: 0;
+    max-height: calc(50vh - 20px);
     /* Support horizontal scrolling for wide vertical chart */
     display: block;
     /* Enhanced scrolling for better UX */
@@ -264,68 +262,14 @@
     padding-top: 70px;
   }
   
-  /* World view - 3-section layout: upper-left map, upper-right empty, lower full-width chart */
+  /* World view - 3-section layout: upper-left map, upper-right comparison, lower full-width chart */
   #world-view {
-    min-height: 100vh;
-    padding-top: 70px;
     display: grid;
     grid-template-columns: 1fr 1fr;
-    grid-template-rows: 1fr 1fr;
+    grid-template-rows: 50vh 50vh;
     grid-template-areas: 
       "upper-left upper-right"
       "lower lower";
-    gap: 10px;
-    padding: 70px 10px 10px 10px;
-  }
-
-  #upper-left-panel {
-    grid-area: upper-left;
-    display: flex;
-    flex-direction: column;
-    background: white;
-    border: 1px solid #e0e0e0;
-    border-radius: 4px;
-  }
-
-  #upper-right-panel {
-    grid-area: upper-right;
-    background: #f9f9f9;
-    border: 1px solid #e0e0e0;
-    border-radius: 4px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #999;
-    font-style: italic;
-  }
-
-  #map-section {
-    flex: 1;
-    width: 100%;
-    height: 100%;
-  }
-
-  #map {
-    width: 100%;
-    height: 100%;
-  }
-
-  #lower-panel {
-    grid-area: lower;
-    display: flex;
-    flex-direction: column;
-    background: white;
-    border: 1px solid #e0e0e0;
-    border-radius: 4px;
-  }
-  
-
-  
-  /* Korea view layout */
-  .korea-layout {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    grid-template-rows: max(40vh, 400px) max(40vh, 400px);
     gap: 20px;
     padding: 60px 20px 80px 20px;
     width: 100%;
@@ -333,8 +277,9 @@
     background: #f5f5f5;
     overflow: visible;
   }
-  
-  .chart-section {
+
+  #upper-left-panel {
+    grid-area: upper-left;
     background: white;
     border-radius: 8px;
     padding: 15px;
@@ -344,202 +289,59 @@
     overflow: hidden;
     height: 100%;
   }
-  
-  .chart-section h3 {
-    margin: 0 0 10px 0;
-    color: #333;
-    font-size: 15px;
-    font-weight: 600;
-  }
-  
-  /* 선택된 나라만 색칠된 세계지도 + Energy Source (첫 번째 박스) */
-  .small-map {
-    grid-column: 1;
-    grid-row: 1;
-  }
-  
-  .chart-section.small-map > div {
-    flex: 1;
+
+  #upper-right-panel {
+    grid-area: upper-right;
+    background: white;
+    border-radius: 8px;
+    padding: 15px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     display: flex;
     flex-direction: column;
-  }
-  
-  #korea-small-map {
-    width: 100%;
-    height: auto;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-  }
-  
-  .map-container {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-  }
-  
-  .map-container h3 {
-    font-size: 14px;
-    margin-bottom: 8px;
-  }
-  
-  .map-container svg {
-    width: 100% !important;
-    height: auto !important;
-    flex: 1;
-  }
-  
-  .source-container {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-  }
-  
-  .source-container svg {
-    width: 100% !important;
-    height: auto !important;
-    flex: 1;
-    max-height: 300px;
-  }
-  
-  /* Energy Source Changes (스택 바 차트) - 두 번째 박스 */
-  .chart-section:nth-child(2) {
-    grid-column: 2;
-    grid-row: 1;
-  }
-  
-  /* Energy Changes (라인 차트) - 세 번째 박스 */
-  .chart-section:nth-child(3) {
-    grid-column: 1;
-    grid-row: 2;
-  }
-  
-  /* Needed Energy (계산기) - 네 번째 박스 */
-  .chart-section:nth-child(4) {
-    grid-column: 2;
-    grid-row: 2;
-  }
-  
-  /* 파이 차트 범례 */
-  .pie-legend {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-top: 10px;
-    justify-content: center;
-  }
-  
-  .legend-item {
-    display: flex;
-    align-items: center;
-    font-size: 11px;
-  }
-  
-  .legend-color {
-    width: 10px;
-    height: 10px;
-    margin-right: 4px;
-    border-radius: 2px;
-  }
-  
-  .legend-color.nuclear { background: #1f77b4; }
-  .legend-color.fossil { background: #ff7f0e; }
-  .legend-color.renewable { background: #2ca02c; }
-  .legend-color.hydro { background: #17a2b8; }
-  .legend-color.other { background: #9467bd; }
-  
-  /* Energy calculator styles */
-  .calculator-content {
-    display: flex;
-    flex-direction: column;
+    overflow: hidden;
     height: 100%;
   }
-  
-  .energy-input {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 15px;
-  }
-  
-  .energy-input input {
+
+  #map-section {
     flex: 1;
-    padding: 8px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    font-size: 14px;
-  }
-  
-  .energy-input label {
-    font-weight: 600;
-    color: #666;
-  }
-  
-  .energy-controls {
-    display: flex;
-    gap: 15px;
-    flex: 1;
-    min-height: 200px;
-  }
-  
-  .energy-sliders {
-    flex: 0 0 60%;
-    margin-right: 15px;
-  }
-  
-  .slider-group {
-    margin-bottom: 8px;
-  }
-  
-  .slider-group label {
-    display: flex;
-    align-items: center;
-    margin-bottom: 3px;
-    font-size: 12px;
-    font-weight: 600;
-    color: #555;
-  }
-  
-  .energy-type-indicator {
-    width: 12px;
-    height: 12px;
-    margin-right: 6px;
-    border-radius: 2px;
-    flex-shrink: 0;
-  }
-  
-  .slider-group input[type="range"] {
     width: 100%;
-    height: 6px;
-    border-radius: 3px;
-    background: #ddd;
-    outline: none;
-  }
-  
-  .energy-pie-container {
+    min-height: 300px;
     display: flex;
-    justify-content: center;
     align-items: center;
-    flex: 1;
-    min-width: 180px;
-    min-height: 180px;
+    justify-content: center;
+    overflow: hidden;
+    background: #fafafa;
+    border-radius: 4px;
+    border: 1px solid #e0e0e0;
+    margin: 5px;
+  }
+
+  #map {
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    display: block;
+    max-width: 100%;
+    max-height: 100%;
+  }
+
+  #lower-panel {
+    grid-area: lower;
+    background: white;
+    border-radius: 8px;
+    padding: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    height: 100%;
+    max-height: 50vh;
   }
   
-  .budget-result {
-    text-align: center;
-    padding: 12px;
-    background: #e8f4f8;
-    border-radius: 6px;
-    border-left: 4px solid #2196F3;
-    margin-top: 15px;
-  }
+
   
-  .budget-result h4 {
-    margin: 0;
-    color: #1976D2;
-    font-size: 14px;
-  }
+  /* Korea view layout */
+
   
   /* Chart styling */
   .consumption-bar { 
@@ -679,17 +481,19 @@
   
   /* Responsive design */
   @media (max-width: 1200px) {
-    .korea-layout {
+    #world-view {
       grid-template-columns: 1fr;
-      grid-template-rows: repeat(4, max(40vh, 400px));
-      padding: 20px 20px 40px 20px;
-      margin-bottom: 10px;
+      grid-template-rows: max(30vh, 300px) max(30vh, 300px) max(40vh, 400px);
+      grid-template-areas: 
+        "upper-left"
+        "upper-right"
+        "lower";
+      padding: 70px 20px 20px 20px;
+      height: auto;
+      min-height: 100vh;
     }
     
-    .chart-section {
-      grid-column: 1 !important;
-      grid-row: auto !important;
-    }
+
   }
   
   @media (max-width: 768px) {
@@ -734,26 +538,7 @@
     display: block;
   }
   
-  /* 한국 뷰 차트들의 반응형 설정 */
-  .chart-section svg:not(.info-icon-small) {
-    width: 100% !important;
-    height: auto !important;
-    max-width: 100%;
-  }
-  
-  /* 작은 정보 아이콘용 스타일 추가 */
-  .chart-section svg.info-icon-small {
-    width: 10px !important;
-    height: 10px !important;
-    max-width: 10px !important;
-    max-height: 10px !important;
-  }
-  
-  .energy-pie-container svg {
-    width: 100% !important;
-    height: auto !important;
-    max-height: 200px;
-  }
+
   
   /* 맵 SVG 스타일 */
   #map {
@@ -815,39 +600,5 @@
   
   /* SVG 요소들이 컨테이너에 맞게 조정 - 위에서 이미 정의됨 */
   
-  /* 정보 아이콘 스타일 */
-  .info-icon-container {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-top: 5px;
-    cursor: pointer;
-    opacity: 0.7;
-    transition: opacity 0.2s ease;
-  }
-  
-  .info-icon-container:hover {
-    opacity: 1;
-  }
-  
-  .info-icon {
-    flex-shrink: 0;
-    width: 10px !important;
-    height: 10px !important;
-  }
-  
-  .info-text {
-    font-size: 11px;
-    color: #888888;
-    font-weight: normal;
-  }
-  
-  /* Korea view allows content to expand with scroll */
-  #korea-view {
-    height: 100vh;
-    padding-top: 70px;
-    overflow-y: auto;
-    overflow-x: hidden;
-    box-sizing: border-box;
-  }
+
   
