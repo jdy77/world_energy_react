@@ -1229,12 +1229,12 @@ const World = ({
       .attr('class', 'trend-line-trade')
       .attr('d', lineTrade)
       .attr('fill', 'none')
-      .attr('stroke', '#8e24aa')
+      .attr('stroke', '#ab47bc')
       .attr('stroke-width', 3)
       .attr('stroke-opacity', 0.8);
     
     // Add dots for data points (always visible)
-    const colors = ['#2196F3', '#999', '#8e24aa'];
+    const colors = ['#2196F3', '#999', '#ab47bc'];
     ['generation', 'consumption', 'trade'].forEach((metric, index) => {
       chartGroup.selectAll(`.dot-${metric}`)
         .data(trendData)
@@ -1361,7 +1361,7 @@ const World = ({
     const legendData = [
       { label: 'Generation', color: '#2196F3' },
       { label: 'Consumption', color: '#999' },
-      { label: 'Total Trade', color: '#8e24aa' }
+      { label: 'Total Trade', color: '#ab47bc' }
     ];
     
     legendData.forEach((item, i) => {
@@ -1406,7 +1406,7 @@ const World = ({
       content += `<div style="width: 10px; height: 10px; background: #999; margin-right: 6px; border-radius: 50%;"></div>`;
       content += `Consumption: <strong>${data.consumption.toLocaleString()} TWh</strong></div>`;
       content += `<div style="display: flex; align-items: center;">`;
-      content += `<div style="width: 10px; height: 10px; background: #8e24aa; margin-right: 6px; border-radius: 50%;"></div>`;
+      content += `<div style="width: 10px; height: 10px; background: #ab47bc; margin-right: 6px; border-radius: 50%;"></div>`;
       content += `Total Trade: <strong>${data.trade.toLocaleString()} TWh</strong></div>`;
       
       tooltip.style('opacity', 1)
