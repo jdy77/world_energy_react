@@ -22,6 +22,10 @@ const World = ({
   const [dragStartCountry, setDragStartCountry] = useState(null);
   const [dragMode, setDragMode] = useState('select'); // 'select' or 'deselect'
   const hasInitialized = useRef(false);
+  
+  // Add ref for immediate drag state access
+  const isDraggingRef = useRef(false);
+  const dragModeRef = useRef('select');
 
   // Initialize selectedCountries with all valid countries on first load only
   useEffect(() => {
@@ -101,24 +105,24 @@ const World = ({
     
     // Create color scale for trade balance (negative = imports, positive = exports)
     const colorScale = value => {
-      const yellowColor = "#ffd700";     // Strong imports (negative values)
-      const lightYellowColor = "#ffeb80"; // Moderate imports
-      const whiteColor = "#ffffff";      // Neutral/balanced
-      const lightGreenColor = "#90ee90"; // Moderate exports
-      const greenColor = "#228b22";      // Strong exports (positive values)
+      const deepOrangeColor = "#ff5722";     // Strong imports (negative values) - Deep Orange
+      const lightOrangeColor = "#ffccbc";    // Moderate imports - Light Orange
+      const whiteColor = "#ffffff";          // Neutral/balanced
+      const lightTealColor = "#b2dfdb";      // Moderate exports - Light Teal
+      const tealColor = "#00897b";           // Strong exports (positive values) - Teal
       
       if (value < 0) {
-        // Negative values (imports) - use yellow scale
+        // Negative values (imports) - use deep orange scale
         return d3.scaleLinear()
           .domain([globalMinTradeBalance, 0])
-          .range([yellowColor, whiteColor])
+          .range([deepOrangeColor, whiteColor])
           .interpolate(d3.interpolateHcl)
           (Math.max(value, globalMinTradeBalance));
       } else {
-        // Positive values (exports) - use green scale
+        // Positive values (exports) - use teal scale  
         return d3.scaleLinear()
           .domain([0, globalMaxTradeBalance])
-          .range([whiteColor, greenColor])
+          .range([whiteColor, tealColor])
           .interpolate(d3.interpolateHcl)
           (Math.min(value, globalMaxTradeBalance));
       }
@@ -228,8 +232,16 @@ const World = ({
     // Set SVG dimensions
     svg.attr('width', width).attr('height', height);
     
-    // Create scales
-    const maxValue = d3.max(chartData, d => Math.max(d.consumption, d.generation));
+    // Create scales - adjust max value to include generation + imports
+    let maxValue = 0;
+    chartData.forEach(country => {
+      const generationValue = country.generation;
+      const importValue = country.hasValidTradeBalance && country.tradeBalance < 0 ? Math.abs(country.tradeBalance) : 0;
+      const totalValue = generationValue + importValue;
+      maxValue = Math.max(maxValue, country.consumption, totalValue);
+    });
+    maxValue += 10; // Add 10 TWh buffer
+    
     const yScale = d3.scaleLinear()
       .domain([0, maxValue])
       .range([chartHeight, 0]);
@@ -281,7 +293,7 @@ const World = ({
         .style('cursor', 'pointer')
         .on('mouseover', function(event, d) {
           d3.select(this).classed('highlighted', true);
-          showBarTooltip(event, country, 'generation');
+          showBarTooltip(event, country, 'generation-with-trade');
         })
         .on('mouseout', function() {
           d3.select(this).classed('highlighted', false);
@@ -310,18 +322,54 @@ const World = ({
           hideTooltip();
         });
       
-      // Trade balance arrow (only if valid trade balance)
-      if (country.hasValidTradeBalance && country.tradeBalance !== 0) {
+      // Trade balance box (only if valid trade balance and not zero)
+      if (country.hasValidTradeBalance && Math.abs(country.tradeBalance) > 0.01) {
         const tradeBalance = country.tradeBalance;
-        const arrowLength = Math.abs(yScale(0) - yScale(Math.abs(tradeBalance)));
-        const arrowColor = tradeBalance > 0 ? '#228b22' : '#ffd700';
+        const tradeAmount = Math.abs(tradeBalance);
+        const boxHeight = Math.abs(yScale(0) - yScale(tradeAmount));
         const generationTop = yScale(country.generation);
+        const boxX = xPos + barOffset;
+        const boxWidth = barWidthAdjusted / 2 - 1;
         
-        // Arrow shaft (vertical line)
-        const arrowX = xPos + barOffset + barWidthAdjusted / 4;
-        const arrowStartY = generationTop;
-        const arrowEndY = tradeBalance > 0 ? generationTop - arrowLength : generationTop + arrowLength;
+        // Import (negative trade balance): deep orange, above generation bar
+        // Export (positive trade balance): teal, below generation bar
+        const isImport = tradeBalance < 0;
+        const boxColor = isImport ? '#ff5722' : '#00897b';
+        const boxY = isImport ? generationTop - boxHeight : generationTop;
         
+        // Dashed rectangle for trade amount
+        chartGroup.append('rect')
+          .attr('class', 'trade-balance-box')
+          .attr('data-country-index', i)
+          .attr('data-country-name', country.country)
+          .attr('x', boxX)
+          .attr('y', boxY)
+          .attr('width', boxWidth)
+          .attr('height', boxHeight)
+          .attr('fill', boxColor)
+          .attr('fill-opacity', 0.3)
+          .attr('stroke', boxColor)
+          .attr('stroke-width', 1)
+          .attr('stroke-dasharray', '3,3')
+          .style('cursor', 'pointer')
+          .on('mouseover', function(event, d) {
+            d3.select(this).attr('stroke-width', 2);
+            showBarTooltip(event, country, 'trade');
+          })
+          .on('mouseout', function() {
+            d3.select(this).attr('stroke-width', 1);
+            hideTooltip();
+          });
+        
+        // Arrow spanning the full height of the trade box
+        const arrowX = boxX + boxWidth / 2;
+        const arrowStartY = isImport ? boxY + boxHeight : boxY;
+        const arrowEndY = isImport ? boxY : boxY + boxHeight;
+        
+        // Adjust arrow head size based on box height
+        const headSize = Math.min(4, boxHeight * 0.3);
+        
+        // Arrow shaft - full height
         chartGroup.append('line')
           .attr('class', 'trade-arrow-shaft')
           .attr('data-country-index', i)
@@ -330,40 +378,41 @@ const World = ({
           .attr('y1', arrowStartY)
           .attr('x2', arrowX)
           .attr('y2', arrowEndY)
-          .attr('stroke', arrowColor)
-          .attr('stroke-width', 3)
+          .attr('stroke', boxColor)
+          .attr('stroke-width', 2)
           .style('cursor', 'pointer')
           .on('mouseover', function(event, d) {
-            d3.select(this).attr('stroke-width', 4);
-            showBarTooltip(event, country, 'trade');
-          })
-          .on('mouseout', function() {
             d3.select(this).attr('stroke-width', 3);
-            hideTooltip();
-          });
-        
-        // Arrow head (triangle)
-        const headSize = 4;
-        const arrowHeadY = arrowEndY;
-        const arrowHeadPoints = tradeBalance > 0 
-          ? `${arrowX},${arrowHeadY} ${arrowX - headSize},${arrowHeadY + headSize} ${arrowX + headSize},${arrowHeadY + headSize}`
-          : `${arrowX},${arrowHeadY} ${arrowX - headSize},${arrowHeadY - headSize} ${arrowX + headSize},${arrowHeadY - headSize}`;
-        
-        chartGroup.append('polygon')
-          .attr('class', 'trade-arrow-head')
-          .attr('data-country-index', i)
-          .attr('data-country-name', country.country)
-          .attr('points', arrowHeadPoints)
-          .attr('fill', arrowColor)
-          .style('cursor', 'pointer')
-          .on('mouseover', function(event, d) {
-            d3.select(this).attr('fill-opacity', 0.8);
             showBarTooltip(event, country, 'trade');
           })
           .on('mouseout', function() {
-            d3.select(this).attr('fill-opacity', 1);
+            d3.select(this).attr('stroke-width', 2);
             hideTooltip();
           });
+        
+        // Arrow head at the direction end
+        if (headSize > 1) { // Only draw arrow head if big enough
+          const arrowHeadY = isImport ? boxY : boxY + boxHeight;
+          const arrowHeadPoints = isImport
+            ? `${arrowX},${arrowHeadY} ${arrowX - headSize},${arrowHeadY + headSize} ${arrowX + headSize},${arrowHeadY + headSize}`
+            : `${arrowX},${arrowHeadY} ${arrowX - headSize},${arrowHeadY - headSize} ${arrowX + headSize},${arrowHeadY - headSize}`;
+          
+          chartGroup.append('polygon')
+            .attr('class', 'trade-arrow-head')
+            .attr('data-country-index', i)
+            .attr('data-country-name', country.country)
+            .attr('points', arrowHeadPoints)
+            .attr('fill', boxColor)
+            .style('cursor', 'pointer')
+            .on('mouseover', function(event, d) {
+              d3.select(this).attr('fill-opacity', 0.8);
+              showBarTooltip(event, country, 'trade');
+            })
+            .on('mouseout', function() {
+              d3.select(this).attr('fill-opacity', 1);
+              hideTooltip();
+            });
+        }
       }
     });
     
@@ -439,20 +488,24 @@ const World = ({
           const currentlySelected = selectedCountries.includes(country.country);
           
           // Start drag mode - determine if we're selecting or deselecting
+          const newDragMode = currentlySelected ? 'deselect' : 'select';
+          
           setIsDragging(true);
-          setDragMode(currentlySelected ? 'deselect' : 'select');
+          setDragMode(newDragMode);
+          isDraggingRef.current = true;
+          dragModeRef.current = newDragMode;
           
           // Toggle this country immediately
           toggleCountrySelection(country.country);
         })
         .on('mouseenter', function(event) {
-          if (isDragging) {
+          if (isDraggingRef.current) {
             // During drag - apply drag mode to this country
             const currentlySelected = selectedCountries.includes(country.country);
             
-            if (dragMode === 'select' && !currentlySelected) {
+            if (dragModeRef.current === 'select' && !currentlySelected) {
               toggleCountrySelection(country.country);
-            } else if (dragMode === 'deselect' && currentlySelected) {
+            } else if (dragModeRef.current === 'deselect' && currentlySelected) {
               toggleCountrySelection(country.country);
             }
           } else {
@@ -461,7 +514,7 @@ const World = ({
           }
         })
         .on('mouseleave', function(event) {
-          if (!isDragging) {
+          if (!isDraggingRef.current) {
             // Reset hover effect
             checkboxIcon.attr('stroke-width', 1);
           }
@@ -593,8 +646,8 @@ const World = ({
     const legendData = [
       { label: 'Generation', color: '#2196F3', opacity: 0.8 },
       { label: 'Consumption', color: '#999', opacity: 0.8 },
-      { label: 'Net Import', color: '#ffd700', opacity: 0.8 },
-      { label: 'Net Export', color: '#228b22', opacity: 0.8 }
+      { label: 'Net Import', color: '#ff5722', opacity: 0.3 },
+      { label: 'Net Export', color: '#00897b', opacity: 0.3 }
     ];
     
     legendData.forEach((item, i) => {
@@ -624,6 +677,15 @@ const World = ({
       
       if (type === 'generation') {
         content += `<div>Generation: ${country.generation.toFixed(1)} TWh</div>`;
+      } else if (type === 'generation-with-trade') {
+        content += `<div>Generation: ${country.generation.toFixed(1)} TWh</div>`;
+        if (country.hasValidTradeBalance && Math.abs(country.tradeBalance) > 0.01) {
+          const tradeType = country.tradeBalance > 0 ? 'Net Exports' : 'Net Imports';
+          content += `<div>${tradeType}: ${Math.abs(country.tradeBalance).toFixed(1)} TWh</div>`;
+          content += `<div>Trade Balance: ${country.tradeBalance.toFixed(1)} TWh</div>`;
+        } else {
+          content += `<div>Trade Balance: Data not available</div>`;
+        }
       } else if (type === 'consumption') {
         content += `<div>Consumption: ${country.consumption.toFixed(1)} TWh</div>`;
       } else if (type === 'trade') {
@@ -632,7 +694,7 @@ const World = ({
           content += `<div>${tradeType}: ${Math.abs(country.tradeBalance).toFixed(1)} TWh</div>`;
           content += `<div>Trade Balance: ${country.tradeBalance.toFixed(1)} TWh</div>`;
         } else {
-          content += `<div>Trade Balance: N/A</div>`;
+          content += `<div>Trade Balance: Data not available</div>`;
         }
       }
       
@@ -664,7 +726,7 @@ const World = ({
           .style('top', (event.pageY - 10) + 'px')
           .html(`
             <div><strong>${countryName}</strong></div>
-            <div>Trade Balance: ${tradeBalance !== null ? tradeBalance.toFixed(1) + ' TWh' : 'N/A'}</div>
+            <div>Trade Balance: ${tradeBalance !== null ? tradeBalance.toFixed(1) + ' TWh' : 'Data not available'}</div>
           `);
       } else {
         tooltip.style('opacity', 1)
@@ -698,15 +760,15 @@ const World = ({
     
     if (!container) return;
     
-    // Set dimensions for comparison chart - use full container width
+    // Set dimensions for comparison chart - use full container
     const containerWidth = container.clientWidth || 400;
     const containerHeight = container.clientHeight || 300;
-    const width = containerWidth; // Use full container width
-    const height = Math.max(containerHeight - 10, 250);
+    const width = containerWidth;
+    const height = containerHeight - 5; // Use almost full container height
     
     svg.selectAll("*").remove();
     
-    const margin = { top: 30, right: 10, bottom: 80, left: 50 }; // Reduced margins
+    const margin = { top: 30, right: 10, bottom: 60, left: 50 }; // Optimized margins to fill space
     const chartWidth = width - margin.left - margin.right;
     const chartHeight = height - margin.top - margin.bottom;
     
@@ -754,8 +816,16 @@ const World = ({
     // Set SVG dimensions
     svg.attr('width', width).attr('height', height);
     
-    // Create scales
-    const maxValue = d3.max(comparisonData, d => Math.max(d.consumption, d.generation));
+    // Create scales - adjust max value to include generation + imports
+    let maxValue = 0;
+    comparisonData.forEach(country => {
+      const generationValue = country.generation;
+      const importValue = country.hasValidTradeBalance && country.tradeBalance < 0 ? Math.abs(country.tradeBalance) : 0;
+      const totalValue = generationValue + importValue;
+      maxValue = Math.max(maxValue, country.consumption, totalValue);
+    });
+    maxValue += 10; // Add 10 TWh buffer
+    
     const yScale = d3.scaleLinear()
       .domain([0, maxValue])
       .range([chartHeight, 0]);
@@ -796,33 +866,33 @@ const World = ({
       const xPos = xScale(country.country);
       const barWidth = xScale.bandwidth();
       
-      // Generation bar (blue) - left half
+      // Generation bar (blue) - left half, closer together
       const generationHeight = chartHeight - yScale(country.generation);
       chartGroup.append('rect')
         .attr('class', 'generation-bar')
-        .attr('x', xPos)
+        .attr('x', xPos + barWidth * 0.1)
         .attr('y', yScale(country.generation))
-        .attr('width', barWidth * 0.45)
+        .attr('width', barWidth * 0.38)
         .attr('height', generationHeight)
         .attr('fill', '#2196F3')
         .attr('fill-opacity', 0.8)
         .style('cursor', 'pointer')
         .on('mouseover', function(event, d) {
           d3.select(this).classed('highlighted', true);
-          showComparisonTooltip(event, country, 'generation');
+          showComparisonTooltip(event, country, 'generation-with-trade');
         })
         .on('mouseout', function() {
           d3.select(this).classed('highlighted', false);
           hideTooltip();
         });
       
-      // Consumption bar (grey) - right half
+      // Consumption bar (grey) - right half, closer together
       const consumptionHeight = chartHeight - yScale(country.consumption);
       chartGroup.append('rect')
         .attr('class', 'consumption-bar')
-        .attr('x', xPos + barWidth * 0.55)
+        .attr('x', xPos + barWidth * 0.52)
         .attr('y', yScale(country.consumption))
-        .attr('width', barWidth * 0.45)
+        .attr('width', barWidth * 0.38)
         .attr('height', consumptionHeight)
         .attr('fill', '#999')
         .attr('fill-opacity', 0.8)
@@ -836,25 +906,59 @@ const World = ({
           hideTooltip();
         });
       
-      // Trade balance arrow (only if valid trade balance)
-      if (country.hasValidTradeBalance && country.tradeBalance !== 0) {
+      // Trade balance box (only if valid trade balance and not zero)
+      if (country.hasValidTradeBalance && Math.abs(country.tradeBalance) > 0.01) {
         const tradeBalance = country.tradeBalance;
-        const arrowLength = Math.abs(yScale(0) - yScale(Math.abs(tradeBalance)));
-        const arrowColor = tradeBalance > 0 ? '#228b22' : '#ffd700';
+        const tradeAmount = Math.abs(tradeBalance);
+        const boxHeight = Math.abs(yScale(0) - yScale(tradeAmount));
         const generationTop = yScale(country.generation);
+        const boxX = xPos + barWidth * 0.1;
+        const boxWidth = barWidth * 0.38;
         
-        // Arrow shaft (vertical line)
-        const arrowX = xPos + barWidth * 0.225;
-        const arrowStartY = generationTop;
-        const arrowEndY = tradeBalance > 0 ? generationTop - arrowLength : generationTop + arrowLength;
+        // Import (negative trade balance): deep orange, above generation bar
+        // Export (positive trade balance): teal, below generation bar
+        const isImport = tradeBalance < 0;
+        const boxColor = isImport ? '#ff5722' : '#00897b';
+        const boxY = isImport ? generationTop - boxHeight : generationTop;
         
+        // Dashed rectangle for trade amount
+        chartGroup.append('rect')
+          .attr('class', 'trade-balance-box')
+          .attr('x', boxX)
+          .attr('y', boxY)
+          .attr('width', boxWidth)
+          .attr('height', boxHeight)
+          .attr('fill', boxColor)
+          .attr('fill-opacity', 0.3)
+          .attr('stroke', boxColor)
+          .attr('stroke-width', 1)
+          .attr('stroke-dasharray', '3,3')
+          .style('cursor', 'pointer')
+          .on('mouseover', function(event, d) {
+            d3.select(this).attr('stroke-width', 2);
+            showComparisonTooltip(event, country, 'trade');
+          })
+          .on('mouseout', function() {
+            d3.select(this).attr('stroke-width', 1);
+            hideTooltip();
+          });
+        
+        // Arrow spanning the full height of the trade box
+        const arrowX = boxX + boxWidth / 2;
+        const arrowStartY = isImport ? boxY + boxHeight : boxY;
+        const arrowEndY = isImport ? boxY : boxY + boxHeight;
+        
+        // Adjust arrow head size based on box height
+        const headSize = Math.min(3, boxHeight * 0.3);
+        
+        // Arrow shaft - full height
         chartGroup.append('line')
           .attr('class', 'trade-arrow-shaft')
           .attr('x1', arrowX)
           .attr('y1', arrowStartY)
           .attr('x2', arrowX)
           .attr('y2', arrowEndY)
-          .attr('stroke', arrowColor)
+          .attr('stroke', boxColor)
           .attr('stroke-width', 2)
           .style('cursor', 'pointer')
           .on('mouseover', function(event, d) {
@@ -866,26 +970,27 @@ const World = ({
             hideTooltip();
           });
         
-        // Arrow head (triangle)
-        const headSize = 3;
-        const arrowHeadY = arrowEndY;
-        const arrowHeadPoints = tradeBalance > 0 
-          ? `${arrowX},${arrowHeadY} ${arrowX - headSize},${arrowHeadY + headSize} ${arrowX + headSize},${arrowHeadY + headSize}`
-          : `${arrowX},${arrowHeadY} ${arrowX - headSize},${arrowHeadY - headSize} ${arrowX + headSize},${arrowHeadY - headSize}`;
-        
-        chartGroup.append('polygon')
-          .attr('class', 'trade-arrow-head')
-          .attr('points', arrowHeadPoints)
-          .attr('fill', arrowColor)
-          .style('cursor', 'pointer')
-          .on('mouseover', function(event, d) {
-            d3.select(this).attr('fill-opacity', 0.8);
-            showComparisonTooltip(event, country, 'trade');
-          })
-          .on('mouseout', function() {
-            d3.select(this).attr('fill-opacity', 1);
-            hideTooltip();
-          });
+        // Arrow head at the direction end
+        if (headSize > 1) { // Only draw arrow head if big enough
+          const arrowHeadY = isImport ? boxY : boxY + boxHeight;
+          const arrowHeadPoints = isImport
+            ? `${arrowX},${arrowHeadY} ${arrowX - headSize},${arrowHeadY + headSize} ${arrowX + headSize},${arrowHeadY + headSize}`
+            : `${arrowX},${arrowHeadY} ${arrowX - headSize},${arrowHeadY - headSize} ${arrowX + headSize},${arrowHeadY - headSize}`;
+          
+          chartGroup.append('polygon')
+            .attr('class', 'trade-arrow-head')
+            .attr('points', arrowHeadPoints)
+            .attr('fill', boxColor)
+            .style('cursor', 'pointer')
+            .on('mouseover', function(event, d) {
+              d3.select(this).attr('fill-opacity', 0.8);
+              showComparisonTooltip(event, country, 'trade');
+            })
+            .on('mouseout', function() {
+              d3.select(this).attr('fill-opacity', 1);
+              hideTooltip();
+            });
+        }
       }
     });
     
@@ -939,6 +1044,15 @@ const World = ({
       
       if (type === 'generation') {
         content += `<div>Generation: ${country.generation.toFixed(1)} TWh</div>`;
+      } else if (type === 'generation-with-trade') {
+        content += `<div>Generation: ${country.generation.toFixed(1)} TWh</div>`;
+        if (country.hasValidTradeBalance && Math.abs(country.tradeBalance) > 0.01) {
+          const tradeType = country.tradeBalance > 0 ? 'Net Exports' : 'Net Imports';
+          content += `<div>${tradeType}: ${Math.abs(country.tradeBalance).toFixed(1)} TWh</div>`;
+          content += `<div>Trade Balance: ${country.tradeBalance.toFixed(1)} TWh</div>`;
+        } else {
+          content += `<div>Trade Balance: Data not available</div>`;
+        }
       } else if (type === 'consumption') {
         content += `<div>Consumption: ${country.consumption.toFixed(1)} TWh</div>`;
       } else if (type === 'trade') {
@@ -947,7 +1061,7 @@ const World = ({
           content += `<div>${tradeType}: ${Math.abs(country.tradeBalance).toFixed(1)} TWh</div>`;
           content += `<div>Trade Balance: ${country.tradeBalance.toFixed(1)} TWh</div>`;
         } else {
-          content += `<div>Trade Balance: N/A</div>`;
+          content += `<div>Trade Balance: Data not available</div>`;
         }
       }
       
@@ -1115,12 +1229,12 @@ const World = ({
       .attr('class', 'trend-line-trade')
       .attr('d', lineTrade)
       .attr('fill', 'none')
-      .attr('stroke', '#90ee90')
+      .attr('stroke', '#8e24aa')
       .attr('stroke-width', 3)
       .attr('stroke-opacity', 0.8);
     
     // Add dots for data points (always visible)
-    const colors = ['#2196F3', '#999', '#90ee90'];
+    const colors = ['#2196F3', '#999', '#8e24aa'];
     ['generation', 'consumption', 'trade'].forEach((metric, index) => {
       chartGroup.selectAll(`.dot-${metric}`)
         .data(trendData)
@@ -1247,7 +1361,7 @@ const World = ({
     const legendData = [
       { label: 'Generation', color: '#2196F3' },
       { label: 'Consumption', color: '#999' },
-      { label: 'Total Trade', color: '#90ee90' }
+      { label: 'Total Trade', color: '#8e24aa' }
     ];
     
     legendData.forEach((item, i) => {
@@ -1292,7 +1406,7 @@ const World = ({
       content += `<div style="width: 10px; height: 10px; background: #999; margin-right: 6px; border-radius: 50%;"></div>`;
       content += `Consumption: <strong>${data.consumption.toLocaleString()} TWh</strong></div>`;
       content += `<div style="display: flex; align-items: center;">`;
-      content += `<div style="width: 10px; height: 10px; background: #90ee90; margin-right: 6px; border-radius: 50%;"></div>`;
+      content += `<div style="width: 10px; height: 10px; background: #8e24aa; margin-right: 6px; border-radius: 50%;"></div>`;
       content += `Total Trade: <strong>${data.trade.toLocaleString()} TWh</strong></div>`;
       
       tooltip.style('opacity', 1)
@@ -1344,28 +1458,31 @@ const World = ({
     });
   }, []);
 
-  // End drag mode
+  // End drag mode - now immediately updates refs
   const handleDragEnd = useCallback(() => {
     setIsDragging(false);
     setDragStartCountry(null);
+    isDraggingRef.current = false;
+    dragModeRef.current = 'select';
   }, []);
 
-  // Add global mouse up listener for drag end
+  // Add global mouse up listener for drag end - improved
   useEffect(() => {
-    const handleGlobalMouseUp = () => {
-      if (isDragging) {
+    const handleGlobalMouseUp = (event) => {
+      if (isDraggingRef.current) {
         handleDragEnd();
       }
     };
 
-    document.addEventListener('mouseup', handleGlobalMouseUp);
-    document.addEventListener('touchend', handleGlobalMouseUp);
+    // Use capture phase for immediate handling
+    document.addEventListener('mouseup', handleGlobalMouseUp, true);
+    document.addEventListener('touchend', handleGlobalMouseUp, true);
 
     return () => {
-      document.removeEventListener('mouseup', handleGlobalMouseUp);
-      document.removeEventListener('touchend', handleGlobalMouseUp);
+      document.removeEventListener('mouseup', handleGlobalMouseUp, true);
+      document.removeEventListener('touchend', handleGlobalMouseUp, true);
     };
-  }, [isDragging, handleDragEnd]);
+  }, [handleDragEnd]);
 
   // Handle window resize for charts
   useEffect(() => {
