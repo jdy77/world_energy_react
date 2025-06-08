@@ -82,6 +82,120 @@ const World = ({
       .on('mouseover', (event, d) => handleMouseOver(event, d))
       .on('mouseout', handleMouseOut);
     
+
+    // Add vertical gradient legend
+    const legend = svg.append('g')
+      .attr('class', 'map-legend')
+      .attr('transform', `translate(30, ${mapHeight - 120})`);
+    
+    // Create gradient definition
+    const defs = svg.append('defs');
+    const gradient = defs.append('linearGradient')
+      .attr('id', 'legend-gradient')
+      .attr('x1', '0%')
+      .attr('y1', '0%')
+      .attr('x2', '0%')
+      .attr('y2', '100%');
+    
+    // Add gradient stops
+    gradient.append('stop')
+      .attr('offset', '0%')
+      .attr('stop-color', '#388e3c'); // High exports (green)
+    
+    gradient.append('stop')
+      .attr('offset', '25%')
+      .attr('stop-color', '#e8f5e8'); // Low exports (light green)
+    
+    gradient.append('stop')
+      .attr('offset', '50%')
+      .attr('stop-color', '#ffffff'); // Balanced (white)
+    
+    gradient.append('stop')
+      .attr('offset', '75%')
+      .attr('stop-color', '#ffccbc'); // Low imports (light brownish orange)
+    
+    gradient.append('stop')
+      .attr('offset', '100%')
+      .attr('stop-color', '#d84315'); // High imports (brownish orange)
+    
+    // Legend background
+    legend.append('rect')
+      .attr('class', 'legend-background')
+      .attr('x', -8)
+      .attr('y', -15)
+      .attr('width', 80)
+      .attr('height', 90)
+      .attr('fill', 'rgba(255, 255, 255, 0.9)')
+      .attr('stroke', '#ddd')
+      .attr('stroke-width', 1)
+      .attr('rx', 4);
+    
+    // Gradient bar
+    legend.append('rect')
+      .attr('class', 'legend-gradient-bar')
+      .attr('x', 0)
+      .attr('y', 15)
+      .attr('width', 15)
+      .attr('height', 50)
+      .attr('fill', 'url(#legend-gradient)')
+      .attr('stroke', '#999')
+      .attr('stroke-width', 0.5);
+    
+    // Legend title
+    legend.append('text')
+      .attr('class', 'legend-title')
+      .attr('x', 0)
+      .attr('y', -5)
+      .style('font-size', '10px')
+      .style('font-weight', '600')
+      .style('fill', '#333')
+      .text('Trade Balance');
+    
+    // High label
+    legend.append('text')
+      .attr('class', 'legend-label')
+      .attr('x', 20)
+      .attr('y', 20)
+      .style('font-size', '9px')
+      .style('fill', '#333')
+      .text('High');
+    
+    // Export label
+    legend.append('text')
+      .attr('class', 'legend-label')
+      .attr('x', 20)
+      .attr('y', 30)
+      .style('font-size', '8px')
+      .style('fill', '#666')
+      .text('Export');
+    
+    // Balanced label
+    legend.append('text')
+      .attr('class', 'legend-label')
+      .attr('x', 20)
+      .attr('y', 42)
+      .style('font-size', '8px')
+      .style('fill', '#666')
+      .text('Balanced');
+    
+    // Import label
+    legend.append('text')
+      .attr('class', 'legend-label')
+      .attr('x', 20)
+      .attr('y', 54)
+      .style('font-size', '8px')
+      .style('fill', '#666')
+      .text('Import');
+    
+    // Low label
+    legend.append('text')
+      .attr('class', 'legend-label')
+      .attr('x', 20)
+      .attr('y', 64)
+      .style('font-size', '9px')
+      .style('fill', '#333')
+      .text('Low');
+    
     updateChoropleth();
   }, [currentYear, getCountryData]);
 
@@ -105,30 +219,30 @@ const World = ({
     
     // Create color scale for trade balance (negative = imports, positive = exports)
     const colorScale = value => {
-      const deepOrangeColor = "#ff5722";     // Strong imports (negative values) - Deep Orange
-      const lightOrangeColor = "#ffccbc";    // Moderate imports - Light Orange
+      const deepBrownOrangeColor = "#d84315"; // Strong imports (negative values) - Brownish Orange
+      const lightBrownOrangeColor = "#ffccbc"; // Moderate imports - Light Brownish Orange
       const whiteColor = "#ffffff";          // Neutral/balanced
-      const lightTealColor = "#b2dfdb";      // Moderate exports - Light Teal
-      const tealColor = "#00897b";           // Strong exports (positive values) - Teal
+      const lightGreenColor = "#e8f5e8";     // Moderate exports - Natural Light Green
+      const greenColor = "#388e3c";          // Strong exports (positive values) - Green
       
       if (value < 0) {
-        // Negative values (imports) - use deep orange scale
+        // Negative values (imports) - use brownish orange scale
         return d3.scaleLinear()
           .domain([globalMinTradeBalance, 0])
-          .range([deepOrangeColor, whiteColor])
+          .range([deepBrownOrangeColor, whiteColor])
           .interpolate(d3.interpolateHcl)
           (Math.max(value, globalMinTradeBalance));
       } else {
-        // Positive values (exports) - use teal scale  
+        // Positive values (exports) - use green scale  
         return d3.scaleLinear()
           .domain([0, globalMaxTradeBalance])
-          .range([whiteColor, tealColor])
+          .range([whiteColor, greenColor])
           .interpolate(d3.interpolateHcl)
           (Math.min(value, globalMaxTradeBalance));
       }
     };
     
-    // Update country colors
+    // Update country colors and highlighting
     svg.select('g').selectAll('path')
       .attr('fill', d => {
         const countryName = d.properties.name;
@@ -150,8 +264,38 @@ const World = ({
           return '#999999';
         }
         return colorScale(value);
+      })
+      .attr('fill-opacity', d => {
+        const countryName = d.properties.name;
+        const isSelected = selectedCountries.includes(countryName);
+        const hasSelections = selectedCountries.length > 0;
+        
+        if (hasSelections) {
+          return isSelected ? 1.0 : 0.3; // Fade non-selected countries
+        }
+        return 1.0; // Normal opacity when no countries selected
+      })
+      .attr('stroke', d => {
+        const countryName = d.properties.name;
+        const isSelected = selectedCountries.includes(countryName);
+        return isSelected ? '#2E7D32' : '#999';
+      })
+      .attr('stroke-width', d => {
+        const countryName = d.properties.name;
+        const isSelected = selectedCountries.includes(countryName);
+        return isSelected ? 2 : 0.5;
+      })
+      .attr('stroke-opacity', d => {
+        const countryName = d.properties.name;
+        const isSelected = selectedCountries.includes(countryName);
+        const hasSelections = selectedCountries.length > 0;
+        
+        if (hasSelections) {
+          return isSelected ? 1.0 : 0.3; // Fade stroke for non-selected countries
+        }
+        return 1.0; // Normal stroke opacity when no countries selected
       });
-  }, [currentYear, getCountryData, globalMaxTradeBalance, globalMinTradeBalance]);
+  }, [currentYear, getCountryData, globalMaxTradeBalance, globalMinTradeBalance, selectedCountries]);
 
   // Initialize horizontal chart
   useEffect(() => {

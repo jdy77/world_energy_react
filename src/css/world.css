@@ -732,6 +732,26 @@
     position: relative;
   }
 
+  /* Map legend styles */
+  .map-legend {
+    pointer-events: none;
+    user-select: none;
+  }
+
+  .legend-background {
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));
+  }
+
+  .map-title {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+    pointer-events: none;
+    user-select: none;
+  }
+
+  .legend-title {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+  }
+
   /* 국가 선택 체크박스 스타일 - Korea.js의 체크박스와 동일 */
   .country-checkbox-container {
     display: flex;
