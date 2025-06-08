@@ -496,7 +496,7 @@
   @media (max-width: 1200px) {
     #world-view {
       grid-template-columns: 1fr;
-      grid-template-rows: max(40vh, 400px) max(40vh, 400px) max(45vh, 400px) max(35vh, 350px);
+      grid-template-rows: auto auto auto auto;
       grid-template-areas: 
         "upper-left"
         "upper-right"
@@ -506,24 +506,46 @@
       gap: 25px;
       height: auto;
       min-height: calc(100vh + 260px);
+      overflow-x: auto;
     }
     
     #upper-left-panel,
     #upper-right-panel {
       min-height: 400px;
-      min-width: 690px !important;
+      min-width: 100%;
+      max-width: 100%;
+      width: 100%;
+      overflow-x: auto;
     }
     
     #middle-panel {
       min-height: 400px;
-      min-width: 650px;
+      min-width: 100%;
+      max-width: 100%;
+      width: 100%;
       max-height: none;
+      overflow-x: auto;
     }
 
     #bottom-panel {
       min-height: 350px;
-      min-width: 650px;
+      min-width: 100%;
+      max-width: 100%;
+      width: 100%;
       max-height: none;
+      overflow-x: auto;
+    }
+
+    .map-wrapper {
+      width: 100%;
+      min-width: 600px;
+      height: 400px;
+    }
+
+    .chart-wrapper {
+      width: 100%;
+      min-width: 650px;
+      height: 620px;
     }
   }
   
@@ -536,13 +558,6 @@
       padding-top: 70px;
       padding-bottom: 70px;
     }
-
-    /* .view-container {
-      display: flex;
-      min-height: calc(100vh - 70px);
-      padding-top: 70px;
-      padding-bottom: 70px;
-    } */
     
     header {
       flex-direction: column;
@@ -577,12 +592,13 @@
     #world-view {
       padding: 120px 20px 50px 20px !important;
       gap: 20px;
-      grid-template-rows: max(35vh, 350px) max(35vh, 350px) max(40vh, 350px) max(30vh, 300px);
+      grid-template-rows: auto auto auto auto;
       grid-template-areas: 
         "upper-left"
         "upper-right"
         "middle"
         "bottom";
+      overflow-x: auto;
     }
     
     #upper-left-panel,
@@ -590,21 +606,39 @@
     #middle-panel,
     #bottom-panel {
       padding: 15px;
-      min-height: 350px;
+      min-height: 300px;
+      min-width: 100%;
+      max-width: 100%;
+      width: 100%;
+      overflow-x: auto;
     }
 
     #bottom-panel {
-      min-height: 300px;
+      min-height: 280px;
+    }
+    
+    .map-wrapper {
+      width: 100%;
+      min-width: 320px;
+      height: 280px;
+    }
+
+    .chart-wrapper {
+      width: 100%;
+      min-width: 400px;
+      height: 350px;
     }
     
     #map-section {
-      min-height: 400px;
-      min-width: 650px;
+      width: 100%;
+      min-width: 320px;
+      height: 100%;
     }
     
     #map {
-      min-height: 400px;
-      min-width: 650px;
+      width: 100%;
+      height: auto;
+      min-width: 320px;
     }
   }
   
