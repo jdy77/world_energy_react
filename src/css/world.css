@@ -57,14 +57,12 @@
     margin: 0;
   }
   
-      #horizontal-chart-container {
+  #horizontal-chart-container {
     flex: 1;
-    overflow-y: auto;
-    overflow-x: auto;
-    min-height: 0;
-    max-height: calc(50vh - 20px);
-    /* Support horizontal scrolling for wide vertical chart */
-    display: block;
+    display: flex;
+    flex-direction: column;
+    height: 620px;
+    min-height: 620px;
     /* Enhanced scrolling for better UX */
     scrollbar-width: thick;
     scrollbar-color: #666 #f0f0f0;
@@ -117,8 +115,8 @@
   }
   
   .consumption-bar {
-    fill: #ffc107;
-    fill-opacity: 0.7;
+    fill: #999;
+    fill-opacity: 0.8;
     transition: all 0.2s ease;
   }
   
@@ -136,7 +134,7 @@
   
   /* Highlighted bar styles */
   .consumption-bar.highlighted {
-    fill: #ff9800;
+    fill: #666;
     fill-opacity: 1;
     stroke: #fff;
     stroke-width: 1;
@@ -259,21 +257,23 @@
   .view-container {
     display: flex;
     min-height: calc(100vh - 70px);
-    padding-top: 70px;
+    margin-top: 30px;
   }
   
-  /* World view - 3-section layout: upper-left map, upper-right comparison, lower full-width chart */
+  /* World view - 4-section layout: upper-left map, upper-right comparison, middle full-width chart, bottom full-width trend */
   #world-view {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    grid-template-rows: 50vh 50vh;
+    grid-template-columns: 690px 1fr;
+    grid-template-rows: auto auto auto;
     grid-template-areas: 
       "upper-left upper-right"
-      "lower lower";
-    gap: 20px;
-    padding: 60px 20px 80px 20px;
+      "middle middle"
+      "bottom bottom";
+    gap: 30px !important;
+    padding: 120px 40px 70px 40px !important;
+    margin-top: 0 !important;
     width: 100%;
-    min-height: calc(100vh + 40px);
+    min-height: calc(100vh + 400px) !important;
     background: #f5f5f5;
     overflow: visible;
   }
@@ -282,60 +282,73 @@
     grid-area: upper-left;
     background: white;
     border-radius: 8px;
-    padding: 15px;
+    padding: 20px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    height: 100%;
+    height: fit-content;
+    min-height: auto;
+    width: 690px !important;
   }
 
   #upper-right-panel {
     grid-area: upper-right;
     background: white;
     border-radius: 8px;
-    padding: 15px;
+    padding: 20px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    height: 100%;
+    height: 440px;
+    min-height: 440px;
   }
 
   #map-section {
-    flex: 1;
     width: 100%;
-    min-height: 300px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    overflow: hidden;
-    background: #fafafa;
-    border-radius: 4px;
-    border: 1px solid #e0e0e0;
-    margin: 5px;
+    height: 100%;
+    background: transparent;
+    border: none;
+    margin: 0;
+    padding: 10px;
+    position: relative;
   }
 
   #map {
-    width: 100%;
-    height: 100%;
-    min-height: 0;
     display: block;
-    max-width: 100%;
-    max-height: 100%;
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: auto;
   }
 
-  #lower-panel {
-    grid-area: lower;
+  #middle-panel {
+    grid-area: middle;
     background: white;
     border-radius: 8px;
-    padding: 8px;
+    padding: 20px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     display: flex;
     flex-direction: column;
-    overflow: hidden;
-    height: 100%;
-    max-height: 50vh;
+    overflow: visible;
+    height: 670px;
+    min-height: 670px;
+    overflow-y: hidden;
+  }
+
+  #bottom-panel {
+    grid-area: bottom;
+    background: white;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    display: flex;
+    flex-direction: column;
+    overflow: visible;
+    height: 400px;
+    min-height: 400px;
+    overflow-y: hidden;
   }
   
 
@@ -483,24 +496,53 @@
   @media (max-width: 1200px) {
     #world-view {
       grid-template-columns: 1fr;
-      grid-template-rows: max(30vh, 300px) max(30vh, 300px) max(40vh, 400px);
+      grid-template-rows: max(40vh, 400px) max(40vh, 400px) max(45vh, 400px) max(35vh, 350px);
       grid-template-areas: 
         "upper-left"
         "upper-right"
-        "lower";
-      padding: 70px 20px 20px 20px;
+        "middle"
+        "bottom";
+      padding: 120px 30px 60px 30px !important;
+      gap: 25px;
       height: auto;
-      min-height: 100vh;
+      min-height: calc(100vh + 260px);
     }
     
+    #upper-left-panel,
+    #upper-right-panel {
+      min-height: 400px;
+      min-width: 690px !important;
+    }
+    
+    #middle-panel {
+      min-height: 400px;
+      min-width: 650px;
+      max-height: none;
+    }
 
+    #bottom-panel {
+      min-height: 350px;
+      min-width: 650px;
+      max-height: none;
+    }
   }
   
   @media (max-width: 768px) {
     .view-container {
+      display: flex;
       flex-direction: column;
       height: auto;
+      min-height: calc(100vh - 70px);
+      padding-top: 70px;
+      padding-bottom: 70px;
     }
+
+    /* .view-container {
+      display: flex;
+      min-height: calc(100vh - 70px);
+      padding-top: 70px;
+      padding-bottom: 70px;
+    } */
     
     header {
       flex-direction: column;
@@ -530,6 +572,39 @@
     
     #country-select {
       min-width: 120px;
+    }
+    
+    #world-view {
+      padding: 120px 20px 50px 20px !important;
+      gap: 20px;
+      grid-template-rows: max(35vh, 350px) max(35vh, 350px) max(40vh, 350px) max(30vh, 300px);
+      grid-template-areas: 
+        "upper-left"
+        "upper-right"
+        "middle"
+        "bottom";
+    }
+    
+    #upper-left-panel,
+    #upper-right-panel,
+    #middle-panel,
+    #bottom-panel {
+      padding: 15px;
+      min-height: 350px;
+    }
+
+    #bottom-panel {
+      min-height: 300px;
+    }
+    
+    #map-section {
+      min-height: 400px;
+      min-width: 650px;
+    }
+    
+    #map {
+      min-height: 400px;
+      min-width: 650px;
     }
   }
   
@@ -600,5 +675,129 @@
   
   /* SVG 요소들이 컨테이너에 맞게 조정 - 위에서 이미 정의됨 */
   
+  /* 새로 추가: wrapper에 고정 크기와 overflow hidden */
+  .map-wrapper {
+    /* width: 100%; */
+    width: 650px;
+    height: 400px;
+    overflow: hidden;
+    background: #fafafa;
+    border-radius: 4px;
+    border: 1px solid #e0e0e0;
+    position: relative;
+  }
 
+  /* 차트 wrapper - 지도와 동일한 방식 */
+  .chart-wrapper {
+    width: 100%;
+    height: 620px;
+    overflow: hidden;
+    background: #fafafa;
+    border-radius: 4px;
+    border: 1px solid #e0e0e0;
+    position: relative;
+  }
+
+  /* 국가 선택 체크박스 스타일 - Korea.js의 체크박스와 동일 */
+  .country-checkbox-container {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 8px;
+    color: #666;
+    cursor: pointer;
+    margin: 0;
+    padding: 2px 4px;
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 3px;
+    border: 1px solid #ddd;
+    transition: all 0.2s ease;
+    user-select: none;
+  }
+
+  .country-checkbox-container:hover {
+    background: rgba(255, 255, 255, 1);
+    border-color: #bbb;
+    color: #333;
+  }
+
+  .country-checkbox-container.selected {
+    background: #e3f2fd;
+    border-color: #2196F3;
+    color: #1976d2;
+  }
+
+  .country-checkbox-icon {
+    width: 8px;
+    height: 8px;
+    border: 1px solid #999;
+    border-radius: 2px;
+    background: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 6px;
+    transition: all 0.2s ease;
+  }
+
+  .country-checkbox-container.selected .country-checkbox-icon {
+    background: #2196F3;
+    border-color: #2196F3;
+    color: white;
+  }
+
+  .country-checkbox-text {
+    font-size: 8px;
+    font-weight: 500;
+    transition: color 0.2s ease;
+  }
+
+  /* Select All / Clear All 버튼 스타일 */
+  .bulk-action-buttons {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    margin-top: 15px;
+  }
+
+  .bulk-action-button {
+    padding: 6px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.9);
+    color: #666;
+    font-size: 9px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    user-select: none;
+  }
+
+  .bulk-action-button:hover {
+    background: #f8f9fa;
+    border-color: #bbb;
+    color: #333;
+  }
+
+  .bulk-action-button.select-all {
+    border-color: #2196F3;
+    color: #2196F3;
+  }
+
+  .bulk-action-button.select-all:hover {
+    background: #e3f2fd;
+    border-color: #1976D2;
+    color: #1976D2;
+  }
+
+  .bulk-action-button.clear-all {
+    border-color: #f44336;
+    color: #f44336;
+  }
+
+  .bulk-action-button.clear-all:hover {
+    background: #ffebee;
+    border-color: #d32f2f;
+    color: #d32f2f;
+  }
   

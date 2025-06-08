@@ -16,10 +16,30 @@ const World = ({
   const mapRef = useRef();
   const horizontalChartRef = useRef();
   const comparisonChartRef = useRef();
+  const trendChartRef = useRef();
   const [selectedCountries, setSelectedCountries] = useState([]);
   const [isDragging, setIsDragging] = useState(false);
   const [dragStartCountry, setDragStartCountry] = useState(null);
   const [dragMode, setDragMode] = useState('select'); // 'select' or 'deselect'
+  const hasInitialized = useRef(false);
+
+  // Initialize selectedCountries with all valid countries on first load only
+  useEffect(() => {
+    if (!hasInitialized.current) {
+      const allValidCountries = [];
+      Object.values(countriesData).forEach(country => {
+        const generation = Number(country.net_generation?.[currentYear]);
+        const consumption = Number(country.net_consumption?.[currentYear]);
+        
+        // Include countries if they have valid generation and consumption data
+        if (!isNaN(generation) && !isNaN(consumption)) {
+          allValidCountries.push(country.name);
+        }
+      });
+      setSelectedCountries(allValidCountries);
+      hasInitialized.current = true;
+    }
+  }, [currentYear, countriesData]);
 
   // Initialize map
   useEffect(() => {
@@ -30,21 +50,22 @@ const World = ({
     
     if (!container) return;
     
-    const containerWidth = container.clientWidth;
-    const containerHeight = container.clientHeight;
-    const width = containerWidth;
-    const height = containerHeight;
-    
     svg.selectAll("*").remove(); // Clear previous content
-    svg.attr('width', width).attr('height', height);
-    
-    const projection = d3.geoNaturalEarth1().fitSize([width - 20, height - 20], feature(world, world.objects.countries));
-    const path = d3.geoPath(projection);
     
     const land = feature(world, world.objects.countries);
     
-    const mapGroup = svg.append('g')
-      .attr('transform', 'translate(10, 10)');
+    // 고정 크기로 지도 렌더링 (여백 없이)
+    const mapWidth = 600;  // 적당한 크기
+    const mapHeight = 400;
+    
+    const projection = d3.geoNaturalEarth1().fitSize([mapWidth, mapHeight], land);
+    const path = d3.geoPath(projection);
+    
+    // SVG 크기를 고정 크기로 설정
+    svg.attr('width', mapWidth).attr('height', mapHeight);
+    
+    // g 요소에 transform 없이 렌더링
+    const mapGroup = svg.append('g');
     
     mapGroup.selectAll('path')
       .data(land.features)
@@ -158,9 +179,9 @@ const World = ({
     
     svg.selectAll("*").remove();
     
-    const margin = { top: 10, right: 25, bottom: 45, left: 40 };
+    const margin = { top: 50, right: 25, bottom: 45, left: 40 };
     const chartWidth = width - margin.left - margin.right;
-    const chartHeight = Math.min(height - margin.top - margin.bottom, 400); // Cap max height at 400px (doubled)
+    const chartHeight = Math.min(height - margin.top - margin.bottom, 450); // Cap max height at 450px
     
     // Prepare data - include ALL countries (no filtering)
     const allChartData = [];
@@ -267,7 +288,7 @@ const World = ({
           hideTooltip();
         });
       
-      // Consumption bar (yellow)
+      // Consumption bar (grey)
       const consumptionHeight = chartHeight - yScale(country.consumption);
       chartGroup.append('rect')
         .attr('class', 'consumption-bar')
@@ -277,8 +298,8 @@ const World = ({
         .attr('y', yScale(country.consumption))
         .attr('width', barWidthAdjusted / 2 - 1)
         .attr('height', consumptionHeight)
-        .attr('fill', '#ffc107')
-        .attr('fill-opacity', 0.7)
+        .attr('fill', '#999')
+        .attr('fill-opacity', 0.8)
         .style('cursor', 'pointer')
         .on('mouseover', function(event, d) {
           d3.select(this).classed('highlighted', true);
@@ -352,10 +373,17 @@ const World = ({
       .attr('transform', `translate(0, ${chartHeight})`)
       .call(d3.axisBottom(xScale));
     
-    // Style the x-axis text
+    // Style the x-axis text and color based on selection
     xAxisGroup.selectAll('text')
       .style('font-size', '6px')
-      .style('fill', '#333')
+      .style('fill', d => {
+        const isSelected = selectedCountries.includes(d);
+        return isSelected ? '#2196F3' : '#333';
+      })
+      .style('font-weight', d => {
+        const isSelected = selectedCountries.includes(d);
+        return isSelected ? '600' : 'normal';
+      })
       .attr('transform', 'rotate(-45)')
       .style('text-anchor', 'end');
     
@@ -363,7 +391,7 @@ const World = ({
     chartData.forEach((country, i) => {
       const xPos = xScale(country.country);
       const isSelected = selectedCountries.includes(country.country);
-      const buttonY = chartHeight + 10; // Position below the country names
+      const buttonY = chartHeight + 25; // Position further below the country names
       
       // Create a button group to handle all events together
       const buttonGroup = chartGroup.append('g')
@@ -372,32 +400,35 @@ const World = ({
         .style('cursor', 'pointer')
         .style('user-select', 'none');
       
-      // Add selection button background
-      const button = buttonGroup.append('rect')
-        .attr('class', 'country-selector')
-        .attr('x', xPos - 5)
-        .attr('y', buttonY)
-        .attr('width', xScale.bandwidth() + 10)
-        .attr('height', 18)
-        .attr('fill', isSelected ? '#4CAF50' : '#666666')
-        .attr('fill-opacity', isSelected ? 1.0 : 0.1)
-        .attr('stroke', isSelected ? '#2E7D32' : '#999')
-        .attr('stroke-opacity', isSelected ? 1.0 : 0.3)
-        .attr('stroke-width', 1)
-        .attr('rx', 3);
+      // Add checkbox icon only - no background
+      const iconSize = 10;
+      const iconX = xPos + xScale.bandwidth() / 2 - iconSize / 2;
+      const iconY = buttonY;
       
-      // Add selection button text
-      const buttonText = buttonGroup.append('text')
-        .attr('class', 'country-selector-text')
-        .attr('x', xPos + xScale.bandwidth() / 2)
-        .attr('y', buttonY + 12)
-        .attr('text-anchor', 'middle')
-        .style('font-size', '8px')
-        .style('font-weight', '700')
-        .style('fill', isSelected ? 'white' : '#666')
-        .style('pointer-events', 'none')
-        .style('user-select', 'none')
-        .text(isSelected ? '✓' : '+');
+      const checkboxIcon = buttonGroup.append('rect')
+        .attr('class', 'country-checkbox-icon')
+        .attr('x', iconX)
+        .attr('y', iconY)
+        .attr('width', iconSize)
+        .attr('height', iconSize)
+        .attr('fill', isSelected ? '#2196F3' : 'white')
+        .attr('stroke', isSelected ? '#2196F3' : '#999')
+        .attr('stroke-width', 1)
+        .attr('rx', 2);
+      
+      // Add checkmark if selected
+      if (isSelected) {
+        buttonGroup.append('text')
+          .attr('class', 'country-checkbox-checkmark')
+          .attr('x', iconX + iconSize / 2)
+          .attr('y', iconY + iconSize / 2 + 2)
+          .attr('text-anchor', 'middle')
+          .style('font-size', '7px')
+          .style('font-weight', '900')
+          .style('fill', 'white')
+          .style('pointer-events', 'none')
+          .text('✓');
+      }
       
       // Event handlers - Simple and clean
       buttonGroup
@@ -425,17 +456,123 @@ const World = ({
               toggleCountrySelection(country.country);
             }
           } else {
-            // Hover effect when not dragging
-            button.attr('fill-opacity', isSelected ? 0.8 : 0.2);
+            // Hover effect when not dragging - highlight checkbox
+            checkboxIcon.attr('stroke-width', 2);
           }
         })
         .on('mouseleave', function(event) {
           if (!isDragging) {
             // Reset hover effect
-            button.attr('fill-opacity', isSelected ? 1.0 : 0.1);
+            checkboxIcon.attr('stroke-width', 1);
           }
         });
     });
+    
+    // Add Select All / Clear All buttons
+    const buttonY = chartHeight + 45; // Position below the checkboxes
+    const buttonGroup = chartGroup.append('g')
+      .attr('class', 'bulk-action-buttons');
+    
+    // Select All button
+    const selectAllButton = buttonGroup.append('g')
+      .attr('class', 'bulk-action-button select-all')
+      .style('cursor', 'pointer');
+    
+    selectAllButton.append('rect')
+      .attr('x', chartWidth / 2 - 60)
+      .attr('y', buttonY)
+      .attr('width', 50)
+      .attr('height', 20)
+      .attr('fill', 'rgba(255, 255, 255, 0.9)')
+      .attr('stroke', '#2196F3')
+      .attr('stroke-width', 1)
+      .attr('rx', 4);
+    
+    selectAllButton.append('text')
+      .attr('x', chartWidth / 2 - 35)
+      .attr('y', buttonY + 13)
+      .attr('text-anchor', 'middle')
+      .style('font-size', '9px')
+      .style('font-weight', '500')
+      .style('fill', '#2196F3')
+      .style('pointer-events', 'none')
+      .text('Select All');
+    
+    // Clear All button
+    const clearAllButton = buttonGroup.append('g')
+      .attr('class', 'bulk-action-button clear-all')
+      .style('cursor', 'pointer');
+    
+    clearAllButton.append('rect')
+      .attr('x', chartWidth / 2 + 10)
+      .attr('y', buttonY)
+      .attr('width', 50)
+      .attr('height', 20)
+      .attr('fill', 'rgba(255, 255, 255, 0.9)')
+      .attr('stroke', '#f44336')
+      .attr('stroke-width', 1)
+      .attr('rx', 4);
+    
+    clearAllButton.append('text')
+      .attr('x', chartWidth / 2 + 35)
+      .attr('y', buttonY + 13)
+      .attr('text-anchor', 'middle')
+      .style('font-size', '9px')
+      .style('font-weight', '500')
+      .style('fill', '#f44336')
+      .style('pointer-events', 'none')
+      .text('Clear All');
+    
+    // Add event handlers
+    selectAllButton
+      .on('click', function() {
+        const allCountries = chartData.map(d => d.country);
+        setSelectedCountries(allCountries);
+      })
+      .on('mouseenter', function() {
+        d3.select(this).select('rect')
+          .attr('fill', '#e3f2fd')
+          .attr('stroke', '#1976D2');
+        d3.select(this).select('text')
+          .style('fill', '#1976D2');
+      })
+      .on('mouseleave', function() {
+        d3.select(this).select('rect')
+          .attr('fill', 'rgba(255, 255, 255, 0.9)')
+          .attr('stroke', '#2196F3');
+        d3.select(this).select('text')
+          .style('fill', '#2196F3');
+      });
+    
+    clearAllButton
+      .on('click', function() {
+        setSelectedCountries([]);
+      })
+      .on('mouseenter', function() {
+        d3.select(this).select('rect')
+          .attr('fill', '#ffebee')
+          .attr('stroke', '#d32f2f');
+        d3.select(this).select('text')
+          .style('fill', '#d32f2f');
+      })
+      .on('mouseleave', function() {
+        d3.select(this).select('rect')
+          .attr('fill', 'rgba(255, 255, 255, 0.9)')
+          .attr('stroke', '#f44336');
+        d3.select(this).select('text')
+          .style('fill', '#f44336');
+      });
+    
+    // Add chart title
+    svg.append('text')
+      .attr('class', 'chart-title')
+      .attr('x', width / 2)
+      .attr('y', 25)
+      .attr('text-anchor', 'middle')
+      .style('font-size', '14px')
+      .style('font-weight', '600')
+      .style('fill', '#333')
+      .text(`Global Electricity Overview ${currentYear}`);
     
     // Add y-axis label
     chartGroup.append('text')
@@ -447,15 +584,17 @@ const World = ({
       .style('font-size', '9px')
       .style('font-weight', '600')
       .style('fill', '#333')
-      .text('Energy (TWh)');
+      .text('Electricity (TWh)');
     
     // Add legend - positioned at top right
     const legend = svg.append('g')
-      .attr('transform', `translate(${width - 100}, 10)`);
+      .attr('transform', `translate(${width - 120}, 65)`);
     
     const legendData = [
       { label: 'Generation', color: '#2196F3', opacity: 0.8 },
-      { label: 'Consumption', color: '#ffc107', opacity: 0.7 }
+      { label: 'Consumption', color: '#999', opacity: 0.8 },
+      { label: 'Net Import', color: '#ffd700', opacity: 0.8 },
+      { label: 'Net Export', color: '#228b22', opacity: 0.8 }
     ];
     
     legendData.forEach((item, i) => {
@@ -630,22 +769,27 @@ const World = ({
     const chartGroup = svg.append('g')
       .attr('transform', `translate(${margin.left}, ${margin.top})`);
     
-    // Add grid lines (horizontal)
+    // Add y-axis with labels
     const yAxis = d3.axisLeft(yScale)
       .ticks(5)
-      .tickSize(-chartWidth)
       .tickFormat(d => d >= 1000 ? `${(d/1000).toFixed(0)}k` : d);
     
     chartGroup.append('g')
-      .attr('class', 'chart-grid')
+      .attr('class', 'chart-y-axis')
       .call(yAxis)
       .selectAll('text')
       .style('font-size', '9px')
       .style('fill', '#666');
     
-    // Remove grid line labels (keep only grid lines)
-    chartGroup.select('.chart-grid')
-      .selectAll('text').remove();
+    // Add grid lines (horizontal) - separate from y-axis
+    const gridAxis = d3.axisLeft(yScale)
+      .ticks(5)
+      .tickSize(-chartWidth)
+      .tickFormat('');
+    
+    chartGroup.append('g')
+      .attr('class', 'chart-grid')
+      .call(gridAxis);
     
     // Draw bars for each country
     comparisonData.forEach((country, i) => {
@@ -672,7 +816,7 @@ const World = ({
           hideTooltip();
         });
       
-      // Consumption bar (yellow) - right half
+      // Consumption bar (grey) - right half
       const consumptionHeight = chartHeight - yScale(country.consumption);
       chartGroup.append('rect')
         .attr('class', 'consumption-bar')
@@ -680,8 +824,8 @@ const World = ({
         .attr('y', yScale(country.consumption))
         .attr('width', barWidth * 0.45)
         .attr('height', consumptionHeight)
-        .attr('fill', '#ffc107')
-        .attr('fill-opacity', 0.7)
+        .attr('fill', '#999')
+        .attr('fill-opacity', 0.8)
         .style('cursor', 'pointer')
         .on('mouseover', function(event, d) {
           d3.select(this).classed('highlighted', true);
@@ -752,7 +896,14 @@ const World = ({
       .call(d3.axisBottom(xScale))
       .selectAll('text')
       .style('font-size', '10px')
-      .style('fill', '#333')
+      .style('fill', d => {
+        const isSelected = selectedCountries.includes(d);
+        return isSelected ? '#2196F3' : '#333';
+      })
+      .style('font-weight', d => {
+        const isSelected = selectedCountries.includes(d);
+        return isSelected ? '600' : 'normal';
+      })
       .attr('transform', 'rotate(-35)')
       .style('text-anchor', 'end');
     
@@ -766,7 +917,7 @@ const World = ({
       .style('font-size', '11px')
       .style('font-weight', '600')
       .style('fill', '#333')
-      .text('Energy (TWh)');
+      .text('Electricity (TWh)');
     
     // Add title
     chartGroup.append('text')
@@ -814,6 +965,350 @@ const World = ({
       
   }, [currentYear, selectedCountries, countriesData, tooltipRef]);
 
+  // Draw global trend chart
+  const drawTrendChart = useCallback(() => {
+    if (!trendChartRef.current) return;
+    
+    const svg = d3.select(trendChartRef.current);
+    const container = svg.node().parentElement;
+    
+    if (!container) return;
+    
+    // Set dimensions
+    const containerWidth = container.clientWidth || 800;
+    const containerHeight = container.clientHeight || 350;
+    const width = containerWidth;
+    const height = containerHeight;
+    
+    svg.selectAll("*").remove();
+    
+    const margin = { top: 50, right: 120, bottom: 60, left: 80 };
+    const chartWidth = width - margin.left - margin.right;
+    const chartHeight = height - margin.top - margin.bottom;
+    
+    // Calculate global totals for each year
+    const years = [];
+    for (let year = 1990; year <= 2023; year++) {
+      years.push(year);
+    }
+    
+    const trendData = years.map(year => {
+      let totalGeneration = 0;
+      let totalConsumption = 0;
+      let totalTrade = 0; // absolute sum of all trade (imports + exports)
+      
+      Object.values(countriesData).forEach(country => {
+        const generation = Number(country.net_generation?.[year]);
+        const consumption = Number(country.net_consumption?.[year]);
+        const tradeBalance = Number(country.trade_balance?.[year]);
+        
+        if (!isNaN(generation)) totalGeneration += generation;
+        if (!isNaN(consumption)) totalConsumption += consumption;
+        if (!isNaN(tradeBalance)) totalTrade += Math.abs(tradeBalance);
+      });
+      
+      return {
+        year,
+        generation: totalGeneration,
+        consumption: totalConsumption,
+        trade: totalTrade
+      };
+    });
+    
+    // Set SVG dimensions
+    svg.attr('width', width).attr('height', height);
+    
+    // Create scales
+    const xScale = d3.scaleLinear()
+      .domain(d3.extent(years))
+      .range([0, chartWidth]);
+    
+    const maxValue = d3.max(trendData, d => Math.max(d.generation, d.consumption, d.trade));
+    const yScale = d3.scaleLinear()
+      .domain([0, maxValue])
+      .range([chartHeight, 0]);
+    
+    // Create chart group
+    const chartGroup = svg.append('g')
+      .attr('transform', `translate(${margin.left}, ${margin.top})`);
+    
+    // Add grid lines
+    const yAxis = d3.axisLeft(yScale)
+      .ticks(6)
+      .tickSize(-chartWidth)
+      .tickFormat(d => d >= 1000 ? `${(d/1000).toFixed(0)}k` : d);
+    
+    chartGroup.append('g')
+      .attr('class', 'chart-grid')
+      .call(yAxis)
+      .selectAll('text')
+      .style('font-size', '10px')
+      .style('fill', '#666');
+    
+    // Remove grid line labels (keep only grid lines)
+    chartGroup.select('.chart-grid')
+      .selectAll('text').remove();
+    
+    // Add y-axis with labels
+    const yAxisLabels = d3.axisLeft(yScale)
+      .ticks(6)
+      .tickSize(0)
+      .tickFormat(d => d >= 1000 ? `${(d/1000).toFixed(0)}k` : d);
+    
+    chartGroup.append('g')
+      .attr('class', 'chart-y-axis')
+      .call(yAxisLabels)
+      .selectAll('text')
+      .style('font-size', '10px')
+      .style('fill', '#666');
+    
+    // Add x-axis
+    const xAxis = d3.axisBottom(xScale)
+      .ticks(8)
+      .tickFormat(d => d.toString());
+    
+    chartGroup.append('g')
+      .attr('class', 'chart-x-axis')
+      .attr('transform', `translate(0, ${chartHeight})`)
+      .call(xAxis)
+      .selectAll('text')
+      .style('font-size', '10px')
+      .style('fill', '#666');
+    
+    // Create line generators
+    const lineGeneration = d3.line()
+      .x(d => xScale(d.year))
+      .y(d => yScale(d.generation))
+      .curve(d3.curveMonotoneX);
+    
+    const lineConsumption = d3.line()
+      .x(d => xScale(d.year))
+      .y(d => yScale(d.consumption))
+      .curve(d3.curveMonotoneX);
+    
+    const lineTrade = d3.line()
+      .x(d => xScale(d.year))
+      .y(d => yScale(d.trade))
+      .curve(d3.curveMonotoneX);
+    
+    // Draw lines
+    chartGroup.append('path')
+      .datum(trendData)
+      .attr('class', 'trend-line-generation')
+      .attr('d', lineGeneration)
+      .attr('fill', 'none')
+      .attr('stroke', '#2196F3')
+      .attr('stroke-width', 3)
+      .attr('stroke-opacity', 0.8);
+    
+    chartGroup.append('path')
+      .datum(trendData)
+      .attr('class', 'trend-line-consumption')
+      .attr('d', lineConsumption)
+      .attr('fill', 'none')
+      .attr('stroke', '#999')
+      .attr('stroke-width', 3)
+      .attr('stroke-opacity', 0.8);
+    
+    chartGroup.append('path')
+      .datum(trendData)
+      .attr('class', 'trend-line-trade')
+      .attr('d', lineTrade)
+      .attr('fill', 'none')
+      .attr('stroke', '#90ee90')
+      .attr('stroke-width', 3)
+      .attr('stroke-opacity', 0.8);
+    
+    // Add dots for data points (always visible)
+    const colors = ['#2196F3', '#999', '#90ee90'];
+    ['generation', 'consumption', 'trade'].forEach((metric, index) => {
+      chartGroup.selectAll(`.dot-${metric}`)
+        .data(trendData)
+        .join('circle')
+        .attr('class', `dot-${metric}`)
+        .attr('cx', d => xScale(d.year))
+        .attr('cy', d => yScale(d[metric]))
+        .attr('r', 3)
+        .attr('fill', colors[index])
+        .attr('stroke', 'white')
+        .attr('stroke-width', 1)
+        .style('opacity', 1);
+    });
+
+    // Add invisible overlay for mouse interaction
+    const overlay = chartGroup.append('rect')
+      .attr('class', 'chart-overlay')
+      .attr('width', chartWidth)
+      .attr('height', chartHeight)
+      .style('fill', 'none')
+      .style('pointer-events', 'all')
+      .style('cursor', 'crosshair');
+
+    // Add vertical line for hover
+    const hoverLine = chartGroup.append('line')
+      .attr('class', 'hover-line')
+      .attr('y1', 0)
+      .attr('y2', chartHeight)
+      .attr('stroke', '#666')
+      .attr('stroke-width', 1)
+      .attr('stroke-dasharray', '3,3')
+      .style('opacity', 0);
+
+    // Mouse interaction
+    overlay
+      .on('mousemove', function(event) {
+        const [mouseX] = d3.pointer(event, this);
+        const year = Math.round(xScale.invert(mouseX));
+        
+        // Find closest data point
+        const closestData = trendData.find(d => d.year === year) || 
+                           trendData.reduce((prev, curr) => 
+                             Math.abs(curr.year - year) < Math.abs(prev.year - year) ? curr : prev);
+        
+        if (closestData) {
+          const x = xScale(closestData.year);
+          
+          // Update hover line position
+          hoverLine
+            .attr('x1', x)
+            .attr('x2', x)
+            .style('opacity', 1);
+          
+          // Highlight dots at hover position
+          ['generation', 'consumption', 'trade'].forEach(metric => {
+            chartGroup.selectAll(`.dot-${metric}`)
+              .attr('r', d => d.year === closestData.year ? 5 : 3)
+              .attr('stroke-width', d => d.year === closestData.year ? 2 : 1);
+          });
+          
+          // Show tooltip with all values
+          showAllValuesTooltip(event, closestData);
+        }
+      })
+      .on('mouseout', function() {
+        hoverLine.style('opacity', 0);
+        // Reset all dots to normal size
+        chartGroup.selectAll('[class^="dot-"]')
+          .attr('r', 3)
+          .attr('stroke-width', 1);
+        hideTooltip();
+      });
+    
+    // Add current year indicator
+    const currentYearLine = chartGroup.append('line')
+      .attr('class', 'current-year-line')
+      .attr('x1', xScale(currentYear))
+      .attr('x2', xScale(currentYear))
+      .attr('y1', 0)
+      .attr('y2', chartHeight)
+      .attr('stroke', '#ff4444')
+      .attr('stroke-width', 2)
+      .attr('stroke-dasharray', '5,5')
+      .attr('opacity', 0.7);
+    
+    // Add chart title
+    svg.append('text')
+      .attr('class', 'chart-title')
+      .attr('x', width / 2)
+      .attr('y', 25)
+      .attr('text-anchor', 'middle')
+      .style('font-size', '14px')
+      .style('font-weight', '600')
+      .style('fill', '#333')
+      .text('Global Electricity Trends (1990-2023)');
+    
+    // Add y-axis label
+    chartGroup.append('text')
+      .attr('class', 'chart-axis-label')
+      .attr('transform', 'rotate(-90)')
+      .attr('x', -chartHeight / 2)
+      .attr('y', -50)
+      .attr('text-anchor', 'middle')
+      .style('font-size', '11px')
+      .style('font-weight', '600')
+      .style('fill', '#333')
+      .text('Electricity (TWh)');
+    
+    // Add x-axis label
+    chartGroup.append('text')
+      .attr('class', 'chart-axis-label')
+      .attr('x', chartWidth / 2)
+      .attr('y', chartHeight + 45)
+      .attr('text-anchor', 'middle')
+      .style('font-size', '11px')
+      .style('font-weight', '600')
+      .style('fill', '#333')
+      .text('Year');
+    
+    // Add legend
+    const legend = svg.append('g')
+      .attr('transform', `translate(${width - 110}, 60)`);
+    
+    const legendData = [
+      { label: 'Generation', color: '#2196F3' },
+      { label: 'Consumption', color: '#999' },
+      { label: 'Total Trade', color: '#90ee90' }
+    ];
+    
+    legendData.forEach((item, i) => {
+      const legendItem = legend.append('g')
+        .attr('transform', `translate(0, ${i * 20})`);
+      
+      legendItem.append('line')
+        .attr('x1', 0)
+        .attr('x2', 15)
+        .attr('y1', 0)
+        .attr('y2', 0)
+        .attr('stroke', item.color)
+        .attr('stroke-width', 3);
+      
+      legendItem.append('circle')
+        .attr('cx', 7.5)
+        .attr('cy', 0)
+        .attr('r', 3)
+        .attr('fill', item.color)
+        .attr('stroke', 'white')
+        .attr('stroke-width', 1);
+      
+      legendItem.append('text')
+        .attr('x', 20)
+        .attr('y', 4)
+        .style('font-size', '10px')
+        .style('fill', '#333')
+        .text(item.label);
+    });
+
+    // Tooltip functions
+    function showAllValuesTooltip(event, data) {
+      if (!tooltipRef.current) return;
+      
+      const tooltip = d3.select(tooltipRef.current);
+      
+      let content = `<div style="font-weight: 600; margin-bottom: 8px; border-bottom: 1px solid #ddd; padding-bottom: 4px;">${data.year}</div>`;
+      content += `<div style="display: flex; align-items: center; margin-bottom: 4px;">`;
+      content += `<div style="width: 10px; height: 10px; background: #2196F3; margin-right: 6px; border-radius: 50%;"></div>`;
+      content += `Generation: <strong>${data.generation.toLocaleString()} TWh</strong></div>`;
+      content += `<div style="display: flex; align-items: center; margin-bottom: 4px;">`;
+      content += `<div style="width: 10px; height: 10px; background: #999; margin-right: 6px; border-radius: 50%;"></div>`;
+      content += `Consumption: <strong>${data.consumption.toLocaleString()} TWh</strong></div>`;
+      content += `<div style="display: flex; align-items: center;">`;
+      content += `<div style="width: 10px; height: 10px; background: #90ee90; margin-right: 6px; border-radius: 50%;"></div>`;
+      content += `Total Trade: <strong>${data.trade.toLocaleString()} TWh</strong></div>`;
+      
+      tooltip.style('opacity', 1)
+        .style('left', (event.pageX + 15) + 'px')
+        .style('top', (event.pageY - 10) + 'px')
+        .html(content);
+    }
+    
+    function hideTooltip() {
+      if (tooltipRef.current) {
+        d3.select(tooltipRef.current).style('opacity', 0);
+      }
+    }
+      
+  }, [currentYear, countriesData, tooltipRef]);
+
   // Initialize comparison chart
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -824,6 +1319,17 @@ const World = ({
     
     return () => clearTimeout(timer);
   }, [drawComparisonChart]);
+
+  // Initialize trend chart
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (trendChartRef.current) {
+        drawTrendChart();
+      }
+    }, 100);
+    
+    return () => clearTimeout(timer);
+  }, [currentYear]);
 
   // Toggle country selection
   const toggleCountrySelection = useCallback((countryName) => {
@@ -861,11 +1367,34 @@ const World = ({
     };
   }, [isDragging, handleDragEnd]);
 
+  // Handle window resize for charts
+  useEffect(() => {
+    const handleResize = () => {
+      const timer = setTimeout(() => {
+        if (horizontalChartRef.current) {
+          drawHorizontalChart();
+        }
+        if (comparisonChartRef.current) {
+          drawComparisonChart();
+        }
+        if (trendChartRef.current) {
+          drawTrendChart();
+        }
+      }, 100);
+      return () => clearTimeout(timer);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [drawHorizontalChart, drawComparisonChart, drawTrendChart]);
+
   return (
     <div id="world-view" className="view-container">
       <div id="upper-left-panel">
-        <div id="map-section">
-          <svg ref={mapRef} id="map"></svg>
+        <div className="map-wrapper">
+          <div id="map-section">
+            <svg ref={mapRef} id="map"></svg>
+          </div>
         </div>
       </div>
       
@@ -901,9 +1430,17 @@ const World = ({
         </div>
       </div>
       
-      <div id="lower-panel">
+      <div id="middle-panel">
         <div id="horizontal-chart-container">
-          <svg ref={horizontalChartRef} id="horizontal-chart"></svg>
+          <div className="chart-wrapper">
+            <svg ref={horizontalChartRef} id="horizontal-chart"></svg>
+          </div>
+        </div>
+      </div>
+      
+      <div id="bottom-panel">
+        <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
+          <svg ref={trendChartRef} style={{ width: '100%', height: '100%' }}></svg>
         </div>
       </div>
     </div>

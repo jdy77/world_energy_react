@@ -27,7 +27,7 @@ const Overview = () => {
     hydro: 5.0         // 수력
     // 기타 제거, 총합 100%
   });
-  const [neededEnergy, setNeededEnergy] = useState(300000);
+  const [neededEnergy, setNeededEnergy] = useState(500);
   const [showInfoPopup, setShowInfoPopup] = useState(false);
   const [showBudgetInfoPopup, setShowBudgetInfoPopup] = useState(false);
 
@@ -112,13 +112,16 @@ const Overview = () => {
     setCurrentYear(parseInt(event.target.value));
   };
 
-  const handleCountrySelect = (event) => {
-    const country = event.target.value;
-    setSelectedCountry(country);
-    if (country === 'South Korea') {
-      setCurrentView('korea');
-    } else if (country === '') {
-      setCurrentView('world');
+  const handleViewChange = (view) => {
+    setCurrentView(view);
+    if (view === 'korea') {
+      setSelectedCountry('South Korea');
+      // 한국 뷰에서는 2001년 이전 연도를 2001년으로 조정
+      if (currentYear < 2001) {
+        setCurrentYear(2001);
+      }
+    } else {
+      setSelectedCountry('');
     }
   };
 
@@ -131,14 +134,14 @@ const Overview = () => {
     <div id="app-container">
       {/* Header with controls */}
       <header>
-        <h1>World Electricity Data Explorer</h1>
+        <h1>Electricity Data Explorer</h1>
         <div id="controls">
           <div id="year-control">
             <label htmlFor="year-slider">Year: <span id="year-value">{currentYear}</span></label>
             <input 
               id="year-slider" 
               type="range" 
-              min="1990" 
+              min={currentView === 'korea' ? "2001" : "1990"} 
               max="2023" 
               value={currentYear} 
               step="1"
@@ -146,17 +149,27 @@ const Overview = () => {
               onInput={handleYearChange}
             />
             <div className="slider-labels">
-              <span>1990</span>
+              <span>{currentView === 'korea' ? '2001' : '1990'}</span>
               <span>2023</span>
             </div>
           </div>
           
-          <div id="country-control">
-            <label htmlFor="country-select">Country</label>
-            <select id="country-select" value={selectedCountry} onChange={handleCountrySelect}>
-              <option value="">-</option>
-              <option value="South Korea">South Korea</option>
-            </select>
+          <div id="view-control">
+            <label>View</label>
+            <div className="view-buttons">
+              <button 
+                className={`view-button ${currentView === 'world' ? 'active' : ''}`}
+                onClick={() => handleViewChange('world')}
+              >
+                Global Analysis
+              </button>
+              <button 
+                className={`view-button ${currentView === 'korea' ? 'active' : ''}`}
+                onClick={() => handleViewChange('korea')}
+              >
+                Korea Analysis
+              </button>
+            </div>
           </div>
         </div>
       </header>

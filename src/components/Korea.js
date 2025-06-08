@@ -36,6 +36,14 @@ const Korea = ({
     energyBudget: false
   });
 
+  // 고정된 슬라이더 상태 추가
+  const [fixedSliders, setFixedSliders] = useState({
+    fossil: false,
+    nuclear: false,
+    renewable: false,
+    hydro: false
+  });
+
   // Handler for info icon clicks
   const handleInfoIconClick = (iconType, showPopupFunc) => {
     // Mark this icon as clicked
@@ -64,14 +72,10 @@ const Korea = ({
 
   // Korea visualizations effects
   useEffect(() => {
-    const timer = setTimeout(() => {
-      drawKoreaSmallMap();
-      drawKoreaPieChart();
-      drawKoreaLineChart();
-      drawKoreaStackedChart();
-    }, 100);
-    
-    return () => clearTimeout(timer);
+    drawKoreaSmallMap();
+    drawKoreaPieChart();
+    drawKoreaLineChart();
+    drawKoreaStackedChart();
   }, [currentYear]);
 
   // Needed Energy Pie Chart - 실시간 업데이트
@@ -219,7 +223,7 @@ const Korea = ({
   }, [countriesData]);
 
   const drawKoreaLineChart = () => {
-    if (!koreaLineChartRef.current) return;
+    if (!koreaLineChartRef.current || !countriesData) return;
     
     const svg = d3.select(koreaLineChartRef.current);
     svg.selectAll("*").remove();
@@ -773,50 +777,156 @@ const Korea = ({
       .text(d => d.data.value >= 10 ? `${d.data.value.toFixed(1)}%` : '');
   };
 
-  // 퍼센트 정규화 함수 수정 (기타 제거)
+  // 각 슬라이더의 최대값을 계산하는 함수
+  const getSliderMaxValue = (type) => {
+    if (fixedSliders[type]) {
+      // 고정된 슬라이더는 현재 값에서 움직일 수 없음
+      return energyMixPercentages[type];
+    }
+    
+    // 다른 고정된 슬라이더들의 합 계산 (현재 슬라이더 제외)
+    const otherFixedTotal = Object.keys(fixedSliders)
+      .filter(key => key !== type && fixedSliders[key])
+      .reduce((sum, key) => sum + energyMixPercentages[key], 0);
+    
+    // 고정되지 않은 다른 슬라이더들의 최소값 합 계산
+    const otherUnfixedTypes = ['fossil', 'nuclear', 'renewable', 'hydro']
+      .filter(key => key !== type && !fixedSliders[key]);
+    const otherUnfixedMinTotal = otherUnfixedTypes.length * 0.1;
+    
+    // 현재 슬라이더가 가질 수 있는 최대값
+    const maxValue = 100 - otherFixedTotal - otherUnfixedMinTotal;
+    
+    return Math.min(99.9, Math.max(0.1, maxValue));
+  };
+
+  // 퍼센트 정규화 함수 수정
   const normalizePercentages = (changedType, newValue) => {
     const minValue = 0.1;
-    const maxValue = 99.7; // 다른 3개가 최소 0.1씩 가져야 하므로
     
+    // 고정된 슬라이더는 변경 불가
+    if (fixedSliders[changedType]) {
+      return;
+    }
+    
+    // 고정된 슬라이더 수 계산
+    const fixedCount = Object.values(fixedSliders).filter(Boolean).length;
+    
+    // 3개 이상이 고정되어 있으면 변경 불허
+    if (fixedCount >= 3) {
+      return;
+    }
+    
+    // 최대값 제한 적용
+    const maxValue = getSliderMaxValue(changedType);
     const clampedValue = Math.max(minValue, Math.min(maxValue, newValue));
     
+    // 모든 에너지 타입
+    const allTypes = ['fossil', 'nuclear', 'renewable', 'hydro'];
+    
+    // 고정된 슬라이더들 (변경된 슬라이더 제외)
+    const fixedTypes = allTypes.filter(type => fixedSliders[type] && type !== changedType);
+    
+    // 고정되지 않은 슬라이더들 (변경된 슬라이더 제외)
+    const adjustableTypes = allTypes.filter(type => !fixedSliders[type] && type !== changedType);
+    
+    // 고정된 슬라이더들의 총합
+    const fixedTotal = fixedTypes.reduce((sum, type) => sum + energyMixPercentages[type], 0);
+    
+    // 남은 비율 (100% - 변경된 값 - 고정된 값들)
+    const remainingTotal = 100 - clampedValue - fixedTotal;
+    
+    // 새로운 퍼센티지 객체 생성
     const newPercentages = { ...energyMixPercentages };
     newPercentages[changedType] = clampedValue;
     
-    // 기타 제거된 타입들만 처리
-    const otherTypes = ['nuclear', 'fossil', 'renewable', 'hydro'].filter(type => type !== changedType);
-    const remainingTotal = 100 - clampedValue;
-    const currentOtherTotal = otherTypes.reduce((sum, type) => sum + energyMixPercentages[type], 0);
-    
-    if (currentOtherTotal > 0) {
-      otherTypes.forEach(type => {
-        const ratio = energyMixPercentages[type] / currentOtherTotal;
-        const newVal = ratio * remainingTotal;
-        newPercentages[type] = Math.max(minValue, newVal);
-      });
-      
-      const finalTotal = Object.values(newPercentages).reduce((sum, val) => sum + val, 0);
-      if (finalTotal !== 100) {
-        const finalDiff = 100 - finalTotal;
-        const adjustableTypes = otherTypes.filter(type => newPercentages[type] > minValue);
+    if (adjustableTypes.length > 0) {
+      if (remainingTotal > 0) {
+        // 조정 가능한 슬라이더들의 현재 총합
+        const currentAdjustableTotal = adjustableTypes.reduce((sum, type) => sum + energyMixPercentages[type], 0);
         
-        if (adjustableTypes.length > 0) {
-          const adjustableTotal = adjustableTypes.reduce((sum, type) => sum + newPercentages[type], 0);
+        if (currentAdjustableTotal > 0) {
+          // 비례적으로 재분배
           adjustableTypes.forEach(type => {
-            const ratio = newPercentages[type] / adjustableTotal;
-            const adjustment = ratio * finalDiff;
-            newPercentages[type] = Math.max(minValue, newPercentages[type] + adjustment);
+            const ratio = energyMixPercentages[type] / currentAdjustableTotal;
+            const newVal = ratio * remainingTotal;
+            newPercentages[type] = Math.max(minValue, newVal);
+          });
+          
+          // 최소값 적용으로 인한 오차 보정
+          const actualTotal = Object.values(newPercentages).reduce((sum, val) => sum + val, 0);
+          if (Math.abs(actualTotal - 100) > 0.01) {
+            const diff = 100 - actualTotal;
+            
+            // 최소값보다 큰 값을 가진 조정 가능한 타입들로 오차 분산
+            const distributeTypes = adjustableTypes.filter(type => newPercentages[type] > minValue + 0.1);
+            
+            if (distributeTypes.length > 0) {
+              const distributeTotal = distributeTypes.reduce((sum, type) => sum + newPercentages[type], 0);
+              distributeTypes.forEach(type => {
+                const ratio = newPercentages[type] / distributeTotal;
+                const adjustment = ratio * diff;
+                newPercentages[type] = Math.max(minValue, newPercentages[type] + adjustment);
+              });
+            }
+          }
+        } else {
+          // 현재 총합이 0인 경우 균등 분배
+          const equalShare = remainingTotal / adjustableTypes.length;
+          adjustableTypes.forEach(type => {
+            newPercentages[type] = Math.max(minValue, equalShare);
           });
         }
+      } else {
+        // 남은 비율이 0보다 작거나 같은 경우 모든 조정 가능한 슬라이더를 최소값으로
+        adjustableTypes.forEach(type => {
+          newPercentages[type] = minValue;
+        });
       }
     }
     
     setEnergyMixPercentages(newPercentages);
   };
 
+  // 슬라이더 배경 업데이트 함수
+  const updateSliderBackground = (type, value, isFixed = false) => {
+    const percentage = (value / 100) * 100;
+    const fillColor = isFixed ? '#666' : '#2196F3';
+    const backgroundColor = '#ddd';
+    
+    return `linear-gradient(to right, ${fillColor} 0%, ${fillColor} ${percentage}%, ${backgroundColor} ${percentage}%, ${backgroundColor} 100%)`;
+  };
+
   const handleSliderChange = (type, value) => {
+    // 고정된 슬라이더는 변경 불가
+    if (fixedSliders[type]) {
+      return;
+    }
+    
     const newValue = parseFloat(value);
+    
+    // 최대값 제한 확인
+    const maxValue = getSliderMaxValue(type);
+    if (newValue > maxValue) {
+      // 최대값을 초과하면 변경하지 않음
+      return;
+    }
+    
     normalizePercentages(type, newValue);
+  };
+
+  // 고정 체크박스 토글 함수
+  const handleFixedToggle = (type) => {
+    const newFixedSliders = { ...fixedSliders };
+    newFixedSliders[type] = !newFixedSliders[type];
+    
+    // 3개 이상 고정하려고 할 때 방지
+    const fixedCount = Object.values(newFixedSliders).filter(Boolean).length;
+    if (fixedCount > 3) {
+      return; // 3개 초과 고정 방지
+    }
+    
+    setFixedSliders(newFixedSliders);
   };
 
   // 예산 계산 함수 수정 - TWh로 입력받고 백만원/GWh 단가 적용
@@ -895,7 +1005,7 @@ const Korea = ({
                 <path d="M7.37516 11.9582H8.62512V7.16657H7.37516V11.9582ZM8.00014 5.74029C8.19085 5.74029 8.35071 5.67579 8.47971 5.54679C8.60871 5.41779 8.67321 5.25794 8.67321 5.06723C8.67321 4.87654 8.60871 4.71668 8.47971 4.58767C8.35071 4.45867 8.19085 4.39417 8.00014 4.39417C7.80943 4.39417 7.64958 4.45867 7.52058 4.58767C7.39158 4.71668 7.32708 4.87654 7.32708 5.06723C7.32708 5.25794 7.39158 5.41779 7.52058 5.54679C7.64958 5.67579 7.80943 5.74029 8.00014 5.74029ZM8.00154 15.9165C6.90659 15.9165 5.8774 15.7088 4.91396 15.2932C3.9505 14.8777 3.11243 14.3137 2.39975 13.6013C1.68705 12.889 1.12284 12.0513 0.7071 11.0882C0.291364 10.1252 0.0834961 9.09624 0.0834961 8.00129C0.0834961 6.90635 0.291274 5.87716 0.70683 4.91371C1.12239 3.95025 1.68634 3.11218 2.3987 2.3995C3.11108 1.68681 3.94878 1.12259 4.91181 0.706857C5.87482 0.291121 6.9038 0.083252 7.99875 0.083252C9.09369 0.083252 10.1229 0.291031 11.0863 0.706586C12.0498 1.12214 12.8879 1.6861 13.6005 2.39846C14.3132 3.11084 14.8774 3.94854 15.2932 4.91157C15.7089 5.87458 15.9168 6.90356 15.9168 7.9985C15.9168 9.09345 15.709 10.1226 15.2935 11.0861C14.8779 12.0495 14.3139 12.8876 13.6016 13.6003C12.8892 14.313 12.0515 14.8772 11.0885 15.2929C10.1255 15.7087 9.09648 15.9165 8.00154 15.9165ZM8.00014 14.6666C9.86125 14.6666 11.4376 14.0207 12.7293 12.7291C14.021 11.4374 14.6668 9.86101 14.6668 7.9999C14.6668 6.13879 14.021 4.5624 12.7293 3.27073C11.4376 1.97907 9.86125 1.33323 8.00014 1.33323C6.13903 1.33323 4.56264 1.97907 3.27098 3.27073C1.97931 4.5624 1.33348 6.13879 1.33348 7.9999C1.33348 9.86101 1.97931 11.4374 3.27098 12.7291C4.56264 14.0207 6.13903 14.6666 8.00014 14.6666Z" fill="#888888"/>
               </svg>
               <span className="info-text" style={{fontSize: '10px', color: '#888888', fontWeight: 'normal', display: 'inline', verticalAlign: 'middle'}}>
-                생산량이 소비량보다 많은 이유
+                Tip: 생산량이 소비량보다 많은 이유
               </span>
             </span>
           </h3>
@@ -936,7 +1046,7 @@ const Korea = ({
                 <path d="M7.37516 11.9582H8.62512V7.16657H7.37516V11.9582ZM8.00014 5.74029C8.19085 5.74029 8.35071 5.67579 8.47971 5.54679C8.60871 5.41779 8.67321 5.25794 8.67321 5.06723C8.67321 4.87654 8.60871 4.71668 8.47971 4.58767C8.35071 4.45867 8.19085 4.39417 8.00014 4.39417C7.80943 4.39417 7.64958 4.45867 7.52058 4.58767C7.39158 4.71668 7.32708 4.87654 7.32708 5.06723C7.32708 5.25794 7.39158 5.41779 7.52058 5.54679C7.64958 5.67579 7.80943 5.74029 8.00014 5.74029ZM8.00154 15.9165C6.90659 15.9165 5.8774 15.7088 4.91396 15.2932C3.9505 14.8777 3.11243 14.3137 2.39975 13.6013C1.68705 12.889 1.12284 12.0513 0.7071 11.0882C0.291364 10.1252 0.0834961 9.09624 0.0834961 8.00129C0.0834961 6.90635 0.291274 5.87716 0.70683 4.91371C1.12239 3.95025 1.68634 3.11218 2.3987 2.3995C3.11108 1.68681 3.94878 1.12259 4.91181 0.706857C5.87482 0.291121 6.9038 0.083252 7.99875 0.083252C9.09369 0.083252 10.1229 0.291031 11.0863 0.706586C12.0498 1.12214 12.8879 1.6861 13.6005 2.39846C14.3132 3.11084 14.8774 3.94854 15.2932 4.91157C15.7089 5.87458 15.9168 6.90356 15.9168 7.9985C15.9168 9.09345 15.709 10.1226 15.2935 11.0861C14.8779 12.0495 14.3139 12.8876 13.6016 13.6003C12.8892 14.313 12.0515 14.8772 11.0885 15.2929C10.1255 15.7087 9.09648 15.9165 8.00154 15.9165ZM8.00014 14.6666C9.86125 14.6666 11.4376 14.0207 12.7293 12.7291C14.021 11.4374 14.6668 9.86101 14.6668 7.9999C14.6668 6.13879 14.021 4.5624 12.7293 3.27073C11.4376 1.97907 9.86125 1.33323 8.00014 1.33323C6.13903 1.33323 4.56264 1.97907 3.27098 3.27073C1.97931 4.5624 1.33348 6.13879 1.33348 7.9999C1.33348 9.86101 1.97931 11.4374 3.27098 12.7291C4.56264 14.0207 6.13903 14.6666 8.00014 14.6666Z" fill="#888888"/>
               </svg>
               <span className="info-text" style={{fontSize: '10px', color: '#888888', fontWeight: 'normal', display: 'inline', verticalAlign: 'middle'}}>
-                발전 예산 시뮬레이션 사용법
+                Tip: 발전 예산 시뮬레이션 사용법
               </span>
             </span>
           </h3>
@@ -982,24 +1092,59 @@ const Korea = ({
                     hydro: '수력'
                   };
                   
+                  // 슬라이더 상태 계산
+                  const fixedCount = Object.values(fixedSliders).filter(Boolean).length;
+                  const isFixed = fixedSliders[type];
+                  const isDisabled = isFixed || (fixedCount >= 3 && !isFixed);
+                  const maxValue = getSliderMaxValue(type);
+                  
                   return (
                     <div key={type} className="slider-group">
                       <label>
                         <span 
                           className="energy-type-indicator" 
-                          style={{ backgroundColor: colors[type] }}
+                          style={{ 
+                            backgroundColor: colors[type], // 항상 원래 색상 유지
+                            transition: 'background-color 0.3s ease'
+                          }}
                         ></span>
-                            {labels[type]} <span style={{ marginLeft: '8px' }}>{value.toFixed(1)}</span>%
+                        <span style={{ 
+                          color: isFixed ? '#999' : '#555',
+                          transition: 'color 0.3s ease'
+                        }}>
+                          {labels[type]} <span style={{ marginLeft: '8px' }}>{value.toFixed(1)}</span>%
+                        </span>
                       </label>
-                      <input 
-                        type="range" 
-                        min="0.1" 
-                        max="99.7" 
-                        step="0.1"
-                        value={value}
-                        onChange={(e) => handleSliderChange(type, e.target.value)}
-                        onInput={(e) => handleSliderChange(type, e.target.value)}
-                      />
+                      <div className="slider-container">
+                        <input 
+                          type="range" 
+                          min="0.1" 
+                          max="100" // 항상 100으로 고정
+                          step="0.1"
+                          value={value}
+                          onChange={(e) => handleSliderChange(type, e.target.value)}
+                          onInput={(e) => handleSliderChange(type, e.target.value)}
+                          disabled={isDisabled}
+                          className={isFixed ? 'fixed-slider' : ''}
+                          style={{
+                            opacity: isDisabled ? 0.5 : 1,
+                            cursor: isDisabled ? 'not-allowed' : 'pointer',
+                            transition: 'opacity 0.3s ease',
+                            background: updateSliderBackground(type, value, isFixed)
+                          }}
+                        />
+                        <div className="slider-controls">
+                          <label className="checkbox-container">
+                            <input
+                              type="checkbox"
+                              checked={fixedSliders[type]}
+                              onChange={() => handleFixedToggle(type)}
+                              disabled={!fixedSliders[type] && fixedCount >= 3}
+                            />
+                            <span className="checkbox-text">고정</span>
+                          </label>
+                        </div>
+                      </div>
                     </div>
                   );
                 })}
