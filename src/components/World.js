@@ -27,6 +27,56 @@ const World = ({
   const isDraggingRef = useRef(false);
   const dragModeRef = useRef('select');
 
+  // Country name mapping to handle differences between data and map
+  const getMapCountryName = useCallback((dataCountryName) => {
+    const nameMapping = {
+      'United States': 'United States of America',
+      'USA': 'United States of America',
+      'Russia': 'Russian Federation',
+      'South Korea': 'Republic of Korea',
+      'North Korea': 'Democratic People\'s Republic of Korea',
+      'Iran': 'Iran (Islamic Republic of)',
+      'Venezuela': 'Venezuela (Bolivarian Republic of)',
+      'Bolivia': 'Bolivia (Plurinational State of)',
+      'Tanzania': 'United Republic of Tanzania',
+      'Democratic Republic of the Congo': 'Democratic Republic of the Congo',
+      'Congo': 'Republic of the Congo',
+      'Czech Republic': 'Czechia',
+      'Macedonia': 'North Macedonia',
+      'Moldova': 'Republic of Moldova',
+      'Syria': 'Syrian Arab Republic',
+      'Laos': 'Lao People\'s Democratic Republic',
+      'Vietnam': 'Viet Nam',
+      'Brunei': 'Brunei Darussalam'
+    };
+    
+    return nameMapping[dataCountryName] || dataCountryName;
+  }, []);
+
+  // Reverse mapping to convert map country names back to data country names
+  const getDataCountryName = useCallback((mapCountryName) => {
+    const reverseMapping = {
+      'United States of America': 'United States',
+      'Russian Federation': 'Russia',
+      'Republic of Korea': 'South Korea',
+      'Democratic People\'s Republic of Korea': 'North Korea',
+      'Iran (Islamic Republic of)': 'Iran',
+      'Venezuela (Bolivarian Republic of)': 'Venezuela',
+      'Bolivia (Plurinational State of)': 'Bolivia',
+      'United Republic of Tanzania': 'Tanzania',
+      'Republic of the Congo': 'Congo',
+      'Czechia': 'Czech Republic',
+      'North Macedonia': 'Macedonia',
+      'Republic of Moldova': 'Moldova',
+      'Syrian Arab Republic': 'Syria',
+      'Lao People\'s Democratic Republic': 'Laos',
+      'Viet Nam': 'Vietnam',
+      'Brunei Darussalam': 'Brunei'
+    };
+    
+    return reverseMapping[mapCountryName] || mapCountryName;
+  }, []);
+
   // Initialize selectedCountries with all valid countries on first load only
   useEffect(() => {
     if (!hasInitialized.current) {
@@ -245,8 +295,9 @@ const World = ({
     // Update country colors and highlighting
     svg.select('g').selectAll('path')
       .attr('fill', d => {
-        const countryName = d.properties.name;
-        const countryData = getCountryData(countryName);
+        const mapCountryName = d.properties.name;
+        const dataCountryName = getDataCountryName(mapCountryName);
+        const countryData = getCountryData(dataCountryName);
         
         if (!countryData) {
           // Country not in dataset at all - keep light grey
@@ -266,36 +317,45 @@ const World = ({
         return colorScale(value);
       })
       .attr('fill-opacity', d => {
-        const countryName = d.properties.name;
-        const isSelected = selectedCountries.includes(countryName);
+        const mapCountryName = d.properties.name;
+        const dataCountryName = getDataCountryName(mapCountryName);
+        const isSelected = selectedCountries.includes(dataCountryName);
         const hasSelections = selectedCountries.length > 0;
         
         if (hasSelections) {
-          return isSelected ? 1.0 : 0.3; // Fade non-selected countries
+          return isSelected ? 1.0 : 0.2; // Make unselected countries less opaque but still visible
         }
         return 1.0; // Normal opacity when no countries selected
       })
       .attr('stroke', d => {
-        const countryName = d.properties.name;
-        const isSelected = selectedCountries.includes(countryName);
+        const mapCountryName = d.properties.name;
+        const dataCountryName = getDataCountryName(mapCountryName);
+        const isSelected = selectedCountries.includes(dataCountryName);
         return isSelected ? '#2E7D32' : '#999';
       })
       .attr('stroke-width', d => {
-        const countryName = d.properties.name;
-        const isSelected = selectedCountries.includes(countryName);
+        const mapCountryName = d.properties.name;
+        const dataCountryName = getDataCountryName(mapCountryName);
+        const isSelected = selectedCountries.includes(dataCountryName);
         return isSelected ? 2 : 0.5;
       })
       .attr('stroke-opacity', d => {
-        const countryName = d.properties.name;
-        const isSelected = selectedCountries.includes(countryName);
+        const mapCountryName = d.properties.name;
+        const dataCountryName = getDataCountryName(mapCountryName);
+        const isSelected = selectedCountries.includes(dataCountryName);
         const hasSelections = selectedCountries.length > 0;
         
         if (hasSelections) {
-          return isSelected ? 1.0 : 0.3; // Fade stroke for non-selected countries
+          return isSelected ? 1.0 : 0.4; // Make unselected countries stroke less opaque but still visible
         }
         return 1.0; // Normal stroke opacity when no countries selected
       });
-  }, [currentYear, getCountryData, globalMaxTradeBalance, globalMinTradeBalance, selectedCountries]);
+  }, [currentYear, getCountryData, globalMaxTradeBalance, globalMinTradeBalance, selectedCountries, getDataCountryName]);
+
+  // Update choropleth when selectedCountries changes
+  useEffect(() => {
+    updateChoropleth();
+  }, [updateChoropleth]);
 
   // Initialize horizontal chart
   useEffect(() => {
@@ -327,7 +387,7 @@ const World = ({
     
     svg.selectAll("*").remove();
     
-    const margin = { top: 50, right: 25, bottom: 45, left: 40 };
+    const margin = { top: 50, right: 25, bottom: 55, left: 40 };
     const chartWidth = width - margin.left - margin.right;
     const chartHeight = Math.min(height - margin.top - margin.bottom, 450); // Cap max height at 450px
     
@@ -491,7 +551,7 @@ const World = ({
           .attr('width', boxWidth)
           .attr('height', boxHeight)
           .attr('fill', boxColor)
-          .attr('fill-opacity', 0.3)
+          .attr('fill-opacity', 0.7)
           .attr('stroke', boxColor)
           .attr('stroke-width', 1)
           .attr('stroke-dasharray', '3,3')
@@ -511,7 +571,7 @@ const World = ({
         const arrowEndY = isImport ? boxY : boxY + boxHeight;
         
         // Adjust arrow head size based on box height
-        const headSize = Math.min(4, boxHeight * 0.3);
+        const headSize = Math.min(6, boxHeight * 0.4);
         
         // Arrow shaft - full height
         chartGroup.append('line')
@@ -523,14 +583,14 @@ const World = ({
           .attr('x2', arrowX)
           .attr('y2', arrowEndY)
           .attr('stroke', boxColor)
-          .attr('stroke-width', 2)
+          .attr('stroke-width', 3)
           .style('cursor', 'pointer')
           .on('mouseover', function(event, d) {
-            d3.select(this).attr('stroke-width', 3);
+            d3.select(this).attr('stroke-width', 5);
             showBarTooltip(event, country, 'trade');
           })
           .on('mouseout', function() {
-            d3.select(this).attr('stroke-width', 2);
+            d3.select(this).attr('stroke-width', 3);
             hideTooltip();
           });
         
@@ -568,7 +628,7 @@ const World = ({
     
     // Style the x-axis text and color based on selection
     xAxisGroup.selectAll('text')
-      .style('font-size', '6px')
+      .style('font-size', '8px')
       .style('fill', d => {
         const isSelected = selectedCountries.includes(d);
         return isSelected ? '#2196F3' : '#333';
@@ -578,13 +638,14 @@ const World = ({
         return isSelected ? '600' : 'normal';
       })
       .attr('transform', 'rotate(-45)')
-      .style('text-anchor', 'end');
+      .style('text-anchor', 'end')
+      .attr('dy', '0.7em');
     
     // Add selection buttons/areas for each country (below country names)
     chartData.forEach((country, i) => {
       const xPos = xScale(country.country);
       const isSelected = selectedCountries.includes(country.country);
-      const buttonY = chartHeight + 25; // Position further below the country names
+      const buttonY = chartHeight + 35; // Position further below the country names
       
       // Create a button group to handle all events together
       const buttonGroup = chartGroup.append('g')
@@ -666,7 +727,7 @@ const World = ({
     });
     
     // Add Select All / Clear All buttons
-    const buttonY = chartHeight + 45; // Position below the checkboxes
+    const buttonY = chartHeight + 55; // Position below the checkboxes
     const buttonGroup = chartGroup.append('g')
       .attr('class', 'bulk-action-buttons');
     
@@ -856,8 +917,9 @@ const World = ({
   }, [currentYear, getCountryData, selectedCountries, isDragging, dragMode]);
 
   const handleMouseOver = (event, d) => {
-    const countryName = d.properties.name;
-    const countryData = getCountryData(countryName);
+    const mapCountryName = d.properties.name;
+    const dataCountryName = getDataCountryName(mapCountryName);
+    const countryData = getCountryData(dataCountryName);
     
     if (tooltipRef.current) {
       const tooltip = d3.select(tooltipRef.current);
@@ -869,7 +931,7 @@ const World = ({
           .style('left', (event.pageX + 10) + 'px')
           .style('top', (event.pageY - 10) + 'px')
           .html(`
-            <div><strong>${countryName}</strong></div>
+            <div><strong>${dataCountryName}</strong></div>
             <div>Trade Balance: ${tradeBalance !== null ? tradeBalance.toFixed(1) + ' TWh' : 'Data not available'}</div>
           `);
       } else {
@@ -877,7 +939,7 @@ const World = ({
           .style('left', (event.pageX + 10) + 'px')
           .style('top', (event.pageY - 10) + 'px')
           .html(`
-            <div><strong>${countryName}</strong></div>
+            <div><strong>${mapCountryName}</strong></div>
             <div>No data available</div>
           `);
       }
@@ -912,7 +974,7 @@ const World = ({
     
     svg.selectAll("*").remove();
     
-    const margin = { top: 30, right: 10, bottom: 60, left: 50 }; // Optimized margins to fill space
+    const margin = { top: 30, right: 10, bottom: 70, left: 50 }; // Optimized margins to fill space
     const chartWidth = width - margin.left - margin.right;
     const chartHeight = height - margin.top - margin.bottom;
     
@@ -1073,7 +1135,7 @@ const World = ({
           .attr('width', boxWidth)
           .attr('height', boxHeight)
           .attr('fill', boxColor)
-          .attr('fill-opacity', 0.3)
+          .attr('fill-opacity', 0.7)
           .attr('stroke', boxColor)
           .attr('stroke-width', 1)
           .attr('stroke-dasharray', '3,3')
@@ -1093,7 +1155,7 @@ const World = ({
         const arrowEndY = isImport ? boxY : boxY + boxHeight;
         
         // Adjust arrow head size based on box height
-        const headSize = Math.min(3, boxHeight * 0.3);
+        const headSize = Math.min(5, boxHeight * 0.4);
         
         // Arrow shaft - full height
         chartGroup.append('line')
@@ -1103,14 +1165,14 @@ const World = ({
           .attr('x2', arrowX)
           .attr('y2', arrowEndY)
           .attr('stroke', boxColor)
-          .attr('stroke-width', 2)
+          .attr('stroke-width', 3)
           .style('cursor', 'pointer')
           .on('mouseover', function(event, d) {
-            d3.select(this).attr('stroke-width', 3);
+            d3.select(this).attr('stroke-width', 5);
             showComparisonTooltip(event, country, 'trade');
           })
           .on('mouseout', function() {
-            d3.select(this).attr('stroke-width', 2);
+            d3.select(this).attr('stroke-width', 3);
             hideTooltip();
           });
         
@@ -1144,7 +1206,7 @@ const World = ({
       .attr('transform', `translate(0, ${chartHeight})`)
       .call(d3.axisBottom(xScale))
       .selectAll('text')
-      .style('font-size', '10px')
+      .style('font-size', comparisonData.length > 20 ? '7px' : '10px')
       .style('fill', d => {
         const isSelected = selectedCountries.includes(d);
         return isSelected ? '#2196F3' : '#333';
@@ -1154,7 +1216,8 @@ const World = ({
         return isSelected ? '600' : 'normal';
       })
       .attr('transform', 'rotate(-35)')
-      .style('text-anchor', 'end');
+      .style('text-anchor', 'end')
+      .attr('dy', '0.7em');
     
     // Add y-axis label
     chartGroup.append('text')
