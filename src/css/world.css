@@ -66,6 +66,10 @@
     /* Enhanced scrolling for better UX */
     scrollbar-width: thick;
     scrollbar-color: #666 #f0f0f0;
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
   }
 
   /* Enhanced Webkit scrollbar styling for better visibility */
@@ -101,6 +105,10 @@
     max-width: 100%;
     height: auto;
     display: block;
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
   }
   
   /* Chart specific styles */
@@ -303,6 +311,10 @@
     overflow: hidden;
     height: 440px;
     min-height: 440px;
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
   }
 
   #map-section {
@@ -313,6 +325,10 @@
     margin: 0;
     padding: 10px;
     position: relative;
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
   }
 
   #map {

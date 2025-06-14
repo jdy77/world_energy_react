@@ -10,8 +10,6 @@ const Korea = ({
   setCurrentYear,
   world,
   countriesData,
-  koreaEnergySource,
-  southKoreaEnergyAll,
   southKoreaEnergyProperty,
   energyPrice,
   energyMixPercentages,
@@ -30,7 +28,7 @@ const Korea = ({
   const koreaStackedChartRef = useRef();
   const neededEnergyPieRef = useRef();
 
-  // State for tracking which info icons have been clicked
+  // info 아이콘 클릭 상태 추적
   const [infoIconsClicked, setInfoIconsClicked] = useState({
     energyChanges: false,
     energyBudget: false
@@ -44,19 +42,22 @@ const Korea = ({
     hydro: false
   });
 
-  // Handler for info icon clicks
+  // stacked bar 차트에서 선택된 에너지 소스 추적
+  const [selectedEnergySource, setSelectedEnergySource] = useState(null);
+
+  // info 아이콘 클릭 핸들러
   const handleInfoIconClick = (iconType, showPopupFunc) => {
-    // Mark this icon as clicked
+    // 이 아이콘을 클릭했다고 표시
     setInfoIconsClicked(prev => ({
       ...prev,
       [iconType]: true
     }));
     
-    // Show the popup
+    // popup 표시
     showPopupFunc(true);
   };
 
-  // 데이터 변환 함수 - NaN을 0으로 처리, 기타 제거
+  // 데이터 변환 함수 - NaN을 0으로 처리
   const convertPropertyData = useCallback(() => {
     return Object.entries(southKoreaEnergyProperty).map(([year, data]) => ({
       시점: parseInt(year),
@@ -70,13 +71,13 @@ const Korea = ({
   // 변환된 데이터 사용
   const convertedPropertyData = convertPropertyData();
 
-  // Korea visualizations effects
+  // Korea 시각화 효과
   useEffect(() => {
     drawKoreaSmallMap();
     drawKoreaPieChart();
     drawKoreaLineChart();
     drawKoreaStackedChart();
-  }, [currentYear]);
+  }, [currentYear, selectedEnergySource]);
 
   // Needed Energy Pie Chart - 실시간 업데이트
   useEffect(() => {
@@ -416,13 +417,13 @@ const Korea = ({
         .attr('x', xScale(selectedYear))
         .text(selectedYear);
       
-             // Collect all data points for the selected year and sort by value
+      // 선택된 연도의 모든 데이터 포인트를 수집하고 값에 따라 정렬
        const allDataPoints = Object.keys(lineData).map((key, index) => {
          const dataPoint = lineData[key].find(d => d.year === selectedYear);
          return dataPoint ? { key, index, ...dataPoint } : null;
        }).filter(d => d !== null).sort((a, b) => b.value - a.value);
        
-       // Smart label positioning to avoid overlap
+       // 레이블 중복 방지를 위한 위치 계산
        const labelHeight = 15;
        const minLabelSpacing = 18;
        const positions = [];
@@ -436,10 +437,10 @@ const Korea = ({
            .attr('cx', xScale(dataPoint.year))
            .attr('cy', yScale(dataPoint.value));
          
-         // Calculate optimal label position
+         // 최적의 레이블 위치 계산
          let idealY = yScale(dataPoint.value) - 15;
          
-         // Check for conflicts with existing labels
+         // 기존 레이블과의 충돌 확인
          let finalY = idealY;
          let attempts = 0;
          while (attempts < 10) {
@@ -455,7 +456,7 @@ const Korea = ({
              break;
            }
            
-           // Try positioning above and below the ideal position alternately
+           // 이상적인 위치 -위와 아래를 번갈아가며 시도
            if (attempts % 2 === 0) {
              finalY = idealY - ((attempts + 2) / 2) * minLabelSpacing;
            } else {
@@ -464,9 +465,9 @@ const Korea = ({
            attempts++;
          }
          
-         // Ensure labels stay within chart bounds (but can overlap with chart content)
-         finalY = Math.max(finalY, 5); // Don't go above chart
-         finalY = Math.min(finalY, height + 30); // Don't go too far below chart
+         // 레이블이 차트 경계 내에 유지되도록 함 (하지만 차트 콘텐츠와 겹칠 수 있음)
+         finalY = Math.max(finalY, 5); // 차트 위에 가지 않음
+         finalY = Math.min(finalY, height + 30); // 차트 아래로 너무 멀리 가지 않음
          
          positions.push(finalY);
          
@@ -476,7 +477,7 @@ const Korea = ({
            .attr('y', finalY)
            .text(textContent);
          
-         // Position and size background rectangle
+         // 배경 사각형의 위치와 크기 계산
          const bbox = text.node().getBBox();
          textBg
            .attr('x', bbox.x - 2)
@@ -497,9 +498,9 @@ const Korea = ({
       .on('mouseout', mouseout)
       .on('mousemove', mousemove);
 
-    // Add current year indicator
+    // 현재 연도 표시
     if (years.includes(currentYear)) {
-      // Vertical dotted line for current year
+      // 현재 연도 수직 점선
       g.append('line')
         .attr('class', 'current-year-indicator')
         .attr('x1', xScale(currentYear))
@@ -511,7 +512,7 @@ const Korea = ({
         .style('stroke-dasharray', '4,4')
         .style('opacity', 0.8);
 
-      // Current year values labels below x-axis
+      // 현재 연도 값 레이블 (x축 아래)
       const currentYearData = {
         production: lineData.production.find(d => d.year === currentYear),
         imports: lineData.imports.find(d => d.year === currentYear),
@@ -521,9 +522,9 @@ const Korea = ({
       const labelColors = { production: '#2196F3', imports: '#e53e3e', consumption: '#666' };
       const labelTexts = { production: '생산', imports: '수입', consumption: '소비' };
 
-      // Position labels below x-axis
-      const labelStartY = height + 50; // Start below x-axis
-      const labelSpacing = 15; // Space between each label
+      // 레이블 위치 (x축 아래)
+      const labelStartY = height + 50; // x축 아래에서 시작
+      const labelSpacing = 15; // 각 레이블 간의 간격
 
       Object.keys(currentYearData).forEach((key, index) => {
         const data = currentYearData[key];
@@ -540,7 +541,7 @@ const Korea = ({
         }
       });
 
-      // Add circle indicators on the lines for current year
+      // 현재 연도 원 표시
       Object.keys(currentYearData).forEach((key) => {
         const data = currentYearData[key];
         if (data) {
@@ -580,8 +581,24 @@ const Korea = ({
     
     // 변환된 데이터 사용 - 순서 변경, 기타 제거
     const allData = convertedPropertyData;
-    const keys = ['화석연료', '원자력', '신재생에너지', '수력'];
-    const colors = ['#ff7f0e', '#1f77b4', '#2ca02c', '#17a2b8'];
+    const baseKeys = ['화석연료', '원자력', '신재생에너지', '수력'];
+    const baseColors = ['#ff7f0e', '#1f77b4', '#2ca02c', '#17a2b8'];
+    
+    // 선택된 에너지 소스가 있으면 순서를 재배열 (선택된 것이 맨 아래)
+    let keys, colors;
+    if (selectedEnergySource) {
+      const selectedIndex = baseKeys.indexOf(selectedEnergySource);
+      if (selectedIndex !== -1) {
+        keys = [selectedEnergySource, ...baseKeys.filter(k => k !== selectedEnergySource)];
+        colors = [baseColors[selectedIndex], ...baseColors.filter((c, i) => i !== selectedIndex)];
+      } else {
+        keys = baseKeys;
+        colors = baseColors;
+      }
+    } else {
+      keys = baseKeys;
+      colors = baseColors;
+    }
     
     const stack = d3.stack().keys(keys);
     const stackedData = stack(allData);
@@ -609,6 +626,13 @@ const Korea = ({
       .data(stackedData)
       .join('g')
       .attr('fill', d => colorScale(d.key))
+      .attr('fill-opacity', d => {
+        // 선택된 에너지 소스가 있으면 다른 소스들은 투명하게
+        if (selectedEnergySource && d.key !== selectedEnergySource) {
+          return 0.3;
+        }
+        return 1;
+      })
       .selectAll('rect')
       .data(d => d)
       .join('rect')
@@ -695,18 +719,31 @@ const Korea = ({
     
     keys.forEach((key, i) => {
       const legendItem = legend.append('g')
-        .attr('transform', `translate(${i * 85}, 0)`);
+        .attr('transform', `translate(${i * 85}, 0)`)
+        .style('cursor', 'pointer')
+        .on('click', function() {
+          // 이미 선택된 소스를 다시 클릭하면 선택 해제
+          if (selectedEnergySource === key) {
+            setSelectedEnergySource(null);
+          } else {
+            setSelectedEnergySource(key);
+          }
+        });
       
       legendItem.append('rect')
         .attr('width', 10)
         .attr('height', 10)
-        .attr('fill', colorScale(key));
+        .attr('fill', colorScale(key))
+        .attr('fill-opacity', selectedEnergySource && selectedEnergySource !== key ? 0.3 : 1)
+        .attr('stroke', selectedEnergySource === key ? '#333' : 'none')
+        .attr('stroke-width', selectedEnergySource === key ? 2 : 0);
       
       legendItem.append('text')
         .attr('x', 13)
         .attr('y', 8)
         .style('font-size', '10px')
-        .style('fill', '#333')
+        .style('fill', selectedEnergySource && selectedEnergySource !== key ? '#999' : '#333')
+        .style('font-weight', selectedEnergySource === key ? 'bold' : 'normal')
         .text(key);
     });
     
@@ -929,11 +966,11 @@ const Korea = ({
     setFixedSliders(newFixedSliders);
   };
 
-  // 예산 계산 함수 수정 - TWh로 입력받고 백만원/GWh 단가 적용
+  // 예산 계산 함수 - TWh로 입력받고 백만원/GWh 단가 적용
   const calculateBudget = () => {
     if (neededEnergy === 0) return '0';
     
-    // neededEnergy는 이제 TWh 단위, 1 TWh = 1000 GWh
+    // neededEnergy는 TWh 단위, 1 TWh = 1000 GWh
     const energyAmountsInGWh = {
       fossil: (neededEnergy * energyMixPercentages.fossil * 1000) / 100,
       nuclear: (neededEnergy * energyMixPercentages.nuclear * 1000) / 100,

@@ -14,10 +14,10 @@ import southKoreaEnergyAll from '../data/json/south_korea_energy_all.json';
 import southKoreaEnergyProperty from '../data/json/south_korea_energy_property.json';
 
 const Overview = () => {
-  // State variables
+  // 상태 변수들
   const [currentYear, setCurrentYear] = useState(2018);
   const [selectedCountry, setSelectedCountry] = useState('');
-  const [currentView, setCurrentView] = useState('world'); // 'world' or 'korea'
+  const [currentView, setCurrentView] = useState('world'); // 'world' 또는 'korea'
   const [showDetailPanel, setShowDetailPanel] = useState(false);
   const [detailCountry, setDetailCountry] = useState(null);
   const [energyMixPercentages, setEnergyMixPercentages] = useState({
@@ -31,10 +31,10 @@ const Overview = () => {
   const [showInfoPopup, setShowInfoPopup] = useState(false);
   const [showBudgetInfoPopup, setShowBudgetInfoPopup] = useState(false);
 
-  // Tooltip ref
+  // 툴팁 ref
   const tooltipRef = useRef();
 
-  // Calculate global maximum and minimum trade balance values
+  // 전역 최대/최소 무역수지 값 계산
   const globalTradeBalanceRange = React.useMemo(() => {
     let max = -Infinity;
     let min = Infinity;
@@ -54,7 +54,7 @@ const Overview = () => {
   const globalMaxTradeBalance = globalTradeBalanceRange.max;
   const globalMinTradeBalance = globalTradeBalanceRange.min;
 
-  // Create country name mapping
+  // 국가 이름 매핑 생성
   const countryNameToData = React.useMemo(() => {
     const mapping = {};
     Object.values(countriesData).forEach(country => {
@@ -63,7 +63,7 @@ const Overview = () => {
     return mapping;
   }, []);
 
-  // Helper function to find country data
+  // 국가 데이터 찾기 헬퍼 함수
   const getCountryData = useCallback((countryName) => {
     if (countryNameToData[countryName]) {
       return countryNameToData[countryName];
@@ -94,7 +94,7 @@ const Overview = () => {
     return null;
   }, [countryNameToData]);
 
-  // Event handlers
+  // 이벤트 핸들러들
   const handleCountryClick = (event, d) => {
     const countryName = d.properties.name;
     const countryData = getCountryData(countryName);
@@ -132,7 +132,7 @@ const Overview = () => {
 
   return (
     <div id="app-container">
-      {/* Header with controls */}
+      {/* 헤더와 컨트롤 */}
       <header>
         <h1>Electricity Data Explorer</h1>
         <div id="controls">
@@ -210,7 +210,7 @@ const Overview = () => {
         />
       )}
 
-      {/* Detail Panel */}
+      {/* 상세 패널 */}
       {showDetailPanel && detailCountry && (
         <div id="detail-panel">
           <button id="close-detail" onClick={closeDetailPanel}>×</button>
@@ -268,7 +268,7 @@ const Overview = () => {
         </div>
       )}
 
-      {/* Tooltip */}
+      {/* 툴팁 */}
       <div ref={tooltipRef} id="map-tooltip" style={{ position: 'absolute', opacity: 0, pointerEvents: 'none', background: 'rgba(0,0,0,0.8)', color: 'white', padding: '10px', borderRadius: '5px', fontSize: '12px' }}>
       </div>
     </div>
