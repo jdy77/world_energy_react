@@ -597,7 +597,7 @@ const World = ({
       })
       .style('filter', d => {
         const isSelected = selectedCountries.includes(d);
-        return isSelected ? 'drop-shadow(0 0 3px rgba(33, 150, 243, 0.6))' : 'none';
+        return isSelected ? 'drop-shadow(0 0 1px rgba(0, 10, 230, 0.2))' : 'none';
       })
       .attr('transform', 'rotate(-45)')
       .style('text-anchor', 'end')
@@ -614,7 +614,6 @@ const World = ({
         .style('cursor', 'pointer')
         .style('user-select', 'none');
       
-      // 큰 투명 클릭 영역 - x축 텍스트 영역 전체를 커버
       const clickAreaWidth = xScale.bandwidth();
       const clickAreaHeight = 67.5; // 1.5배 더 긴 높이 (45 * 1.5 = 67.5)
       const clickAreaX = xPos;
@@ -1697,11 +1696,11 @@ const World = ({
           <div style={{ flex: 1, position: 'relative' }}>
             {selectedCountries.length === 0 ? (
               <div style={{ height: '85%', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center' }}>
-                <div style={{ fontSize: '14px', color: '#666', lineHeight: '1.6', maxWidth: '300px' }}>
+                <div style={{ fontSize: '14px', color: '#666', lineHeight: '1.6', maxWidth: '450px', width: '100%' }}>
                   <div style={{ marginBottom: '12px', fontWeight: '500', fontSize: '18px' }}>📊 사용 방법</div>
-                  <div style={{ marginBottom: '8px' }}>• 막대 그래프에서 국가명을 클릭하여 비교할 국가 선택</div>
-                  <div style={{ marginBottom: '8px' }}>• 여러 국가를 드래그하여 한 번에 선택/해제 가능</div>
-                  <div style={{ marginBottom: '8px' }}>• 마우스 커서를 차트 위에 올려서 정확한 데이터 확인</div>
+                  <div style={{ marginBottom: '8px', whiteSpace: 'nowrap' }}>• 하단의 막대 그래프에서 국가명을 클릭하여 비교할 국가 선택</div>
+                  <div style={{ marginBottom: '8px', whiteSpace: 'nowrap' }}>• 여러 국가를 드래그하여 한 번에 선택/해제 가능</div>
+                  <div style={{ marginBottom: '8px', whiteSpace: 'nowrap' }}>• 마우스 커서를 차트 위에 올려서 정확한 데이터 확인</div>
                 </div>
               </div>
             ) : (

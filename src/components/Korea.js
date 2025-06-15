@@ -57,6 +57,22 @@ const Korea = ({
     showPopupFunc(true);
   };
 
+  // 팝업이 열릴 때 메인 윈도우 스크롤 방지
+  useEffect(() => {
+    if (showInfoPopup || showBudgetInfoPopup) {
+      // 팝업이 열렸을 때 body 스크롤 방지
+      document.body.style.overflow = 'hidden';
+    } else {
+      // 팝업이 닫혔을 때 body 스크롤 복원
+      document.body.style.overflow = 'unset';
+    }
+
+    // 컴포넌트 언마운트 시 스크롤 복원
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [showInfoPopup, showBudgetInfoPopup]);
+
   // 데이터 변환 함수 - NaN을 0으로 처리
   const convertPropertyData = useCallback(() => {
     return Object.entries(southKoreaEnergyProperty).map(([year, data]) => ({
