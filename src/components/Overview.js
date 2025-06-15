@@ -15,8 +15,7 @@ import southKoreaEnergyProperty from '../data/json/south_korea_energy_property.j
 
 const Overview = () => {
   // 상태 변수들
-  const [currentYear, setCurrentYear] = useState(2018);
-  const [selectedCountry, setSelectedCountry] = useState('');
+  const [currentYear, setCurrentYear] = useState(2023);
   const [currentView, setCurrentView] = useState('world'); // 'world' 또는 'korea'
   const [showDetailPanel, setShowDetailPanel] = useState(false);
   const [detailCountry, setDetailCountry] = useState(null);
@@ -101,7 +100,6 @@ const Overview = () => {
     
     if (countryName === 'South Korea') {
       setCurrentView('korea');
-      setSelectedCountry('South Korea');
     } else if (countryData) {
       setDetailCountry({ name: countryName, data: countryData });
       setShowDetailPanel(true);
@@ -113,16 +111,35 @@ const Overview = () => {
   };
 
   const handleViewChange = (view) => {
-    setCurrentView(view);
-    if (view === 'korea') {
-      setSelectedCountry('South Korea');
-      // 한국 뷰에서는 2001년 이전 연도를 2001년으로 조정
-      if (currentYear < 2001) {
-        setCurrentYear(2001);
-      }
-    } else {
-      setSelectedCountry('');
+    if (view === currentView) return; // 같은 뷰를 클릭하면 아무것도 하지 않음
+    
+    // 현재 view container에 fade-out 클래스 추가
+    const currentViewElement = document.querySelector('.view-container:not(.transitioning)');
+    if (currentViewElement) {
+      currentViewElement.classList.add('fade-out');
+      currentViewElement.classList.add('transitioning');
     }
+    
+    // fade-out이 완료된 후 새로운 뷰로 전환
+    setTimeout(() => {
+      setCurrentView(view);
+      if (view === 'korea') {
+        // 한국 뷰에서는 2001년 이전 연도를 2001년으로 조정
+        if (currentYear < 2001) {
+          setCurrentYear(2001);
+        }
+      }
+      
+      // 다음 프레임에서 새로운 뷰의 fade-in 애니메이션 시작
+      setTimeout(() => {
+        const newViewElement = document.querySelector('.view-container');
+        if (newViewElement) {
+          newViewElement.classList.remove('transitioning');
+          newViewElement.classList.add('fade-in');
+        }
+      }, 50);
+      
+    }, 400); // fade-out 애니메이션 시간과 일치
   };
 
   const closeDetailPanel = () => {

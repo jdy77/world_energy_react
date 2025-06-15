@@ -13,7 +13,7 @@ const PopupEnergyBudget = ({ showPopup, onClose }) => {
       drawElectricSaveChart();
       drawPriceChart();
     }
-  }, [showPopup]);
+  }, [showPopup]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const drawPriceChart = () => {
     if (!priceChartRef.current) return;
@@ -471,7 +471,7 @@ const PopupEnergyBudget = ({ showPopup, onClose }) => {
           dy = parseFloat(text.attr("dy")) || 0,
           tspan = text.text(null).append("tspan").attr("x", -5).attr("y", y).attr("dy", dy + "em");
       
-      while (word = words.pop()) {
+      while ((word = words.pop())) {
         line.push(word);
         tspan.text(line.join(""));
         if (tspan.node().getComputedTextLength() > width) {

@@ -26,31 +26,7 @@ const World = ({
   const isDraggingRef = useRef(false);
   const dragModeRef = useRef('select');
 
-  // 데이터와 지도 간의 차이를 처리하기 위한 국가명 매핑
-  const getMapCountryName = useCallback((dataCountryName) => {
-    const nameMapping = {
-      'United States': 'United States of America',
-      'USA': 'United States of America',
-      'Russia': 'Russian Federation',
-      'South Korea': 'Republic of Korea',
-      'North Korea': 'Democratic People\'s Republic of Korea',
-      'Iran': 'Iran (Islamic Republic of)',
-      'Venezuela': 'Venezuela (Bolivarian Republic of)',
-      'Bolivia': 'Bolivia (Plurinational State of)',
-      'Tanzania': 'United Republic of Tanzania',
-      'Democratic Republic of the Congo': 'Democratic Republic of the Congo',
-      'Congo': 'Republic of the Congo',
-      'Czech Republic': 'Czechia',
-      'Macedonia': 'North Macedonia',
-      'Moldova': 'Republic of Moldova',
-      'Syria': 'Syrian Arab Republic',
-      'Laos': 'Lao People\'s Democratic Republic',
-      'Vietnam': 'Viet Nam',
-      'Brunei': 'Brunei Darussalam'
-    };
-    
-    return nameMapping[dataCountryName] || dataCountryName;
-  }, []);
+
 
   // 지도 국가명을 데이터 국가명으로 다시 변환하기 위한 역매핑
   const getDataCountryName = useCallback((mapCountryName) => {
@@ -74,22 +50,12 @@ const World = ({
     };
     
     return reverseMapping[mapCountryName] || mapCountryName;
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // selectedCountries 초기화 (처음에는 모든 가능한 국가들을 로드)
+  // selectedCountries 초기화 (처음에는 아무 국가도 선택하지 않음)
   useEffect(() => {
     if (!hasInitialized.current) {
-      const allValidCountries = [];
-      Object.values(countriesData).forEach(country => {
-        const generation = Number(country.net_generation?.[currentYear]);
-        const consumption = Number(country.net_consumption?.[currentYear]);
-        
-        // 유효한 발전량과 소비량이 있는 국가만 포함
-        if (!isNaN(generation) && !isNaN(consumption)) {
-          allValidCountries.push(country.name);
-        }
-      });
-      setSelectedCountries(allValidCountries);
+      setSelectedCountries([]); // 빈 배열로 시작
       hasInitialized.current = true;
     }
   }, [currentYear, countriesData]);
@@ -245,7 +211,7 @@ const World = ({
       .text('Low');
     
     updateChoropleth();
-  }, [currentYear, getCountryData]);
+  }, [currentYear, getCountryData]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 조화평면도 색상 업데이트
   const updateChoropleth = useCallback(() => {
@@ -268,9 +234,7 @@ const World = ({
     // 수출과 수입에 대한 색상 스케일 생성 (음수 = 수입, 양수 = 수출)
     const colorScale = value => {
       const deepBrownOrangeColor = "#d84315"; // 강한 수입 (negative values) - Brownish Orange
-      const lightBrownOrangeColor = "#ffccbc"; // 적당한 수입 - Light Brownish Orange
       const whiteColor = "#ffffff";          // 중간
-      const lightGreenColor = "#e8f5e8";     // 적당한 수출 - Natural Light Green
       const greenColor = "#388e3c";          // 강한 수출 (positive values) - Green
       
       if (value < 0) {
@@ -348,7 +312,7 @@ const World = ({
         }
         return 1.0; // 아무 국가도 선택되지 않았을 땐 일반 투명도
       });
-  }, [currentYear, getCountryData, globalMaxTradeBalance, globalMinTradeBalance, selectedCountries, getDataCountryName]);
+  }, [currentYear, getCountryData, globalMaxTradeBalance, globalMinTradeBalance, selectedCountries, getDataCountryName]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 선택된 국가가 변경될 때 조화평면도 업데이트
   useEffect(() => {
@@ -367,7 +331,7 @@ const World = ({
     }, 100);
     
     return () => clearTimeout(timer);
-  }, [currentYear, selectedCountries]);
+  }, [currentYear, selectedCountries]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const drawHorizontalChart = useCallback(() => {
     if (!horizontalChartRef.current) return;
@@ -426,11 +390,7 @@ const World = ({
         .style('fill', '#666');
       return;
     }
-    
-    // 막대 크기 계산
-    const barWidth = Math.max(chartWidth / chartData.length - 4, 8); // 최소 너비 8px
-    const barSpacing = chartWidth / chartData.length;
-    
+
     // SVG 크기 설정
     svg.attr('width', width).attr('height', height);
     
@@ -624,7 +584,7 @@ const World = ({
       .attr('transform', `translate(0, ${chartHeight})`)
       .call(d3.axisBottom(xScale));
     
-    // 선택에 따라 x축 텍스트와 색상 스타일
+    // 선택에 따라 x축 텍스트와 색상 스타일 - 선택된 국가에 글로우 효과 추가
     xAxisGroup.selectAll('text')
       .style('font-size', '8px')
       .style('fill', d => {
@@ -635,15 +595,17 @@ const World = ({
         const isSelected = selectedCountries.includes(d);
         return isSelected ? '600' : 'normal';
       })
+      .style('filter', d => {
+        const isSelected = selectedCountries.includes(d);
+        return isSelected ? 'drop-shadow(0 0 3px rgba(33, 150, 243, 0.6))' : 'none';
+      })
       .attr('transform', 'rotate(-45)')
       .style('text-anchor', 'end')
       .attr('dy', '0.7em');
     
-    // 각 국가에 대한 선택 버튼/영역 추가 (국가명 아래)
+    // 각 국가에 대한 선택 버튼/영역 추가 (국가명 영역 전체를 커버하는 큰 투명 버튼)
     chartData.forEach((country, i) => {
       const xPos = xScale(country.country);
-      const isSelected = selectedCountries.includes(country.country);
-      const buttonY = chartHeight + 35; // 국가명 아래 더 아래에 위치
       
       // 모든 이벤트를 처리하기 위한 버튼 그룹 생성
       const buttonGroup = chartGroup.append('g')
@@ -652,35 +614,20 @@ const World = ({
         .style('cursor', 'pointer')
         .style('user-select', 'none');
       
-      // 체크박스 아이콘만 추가 - 배경 없음
-      const iconSize = 10;
-      const iconX = xPos + xScale.bandwidth() / 2 - iconSize / 2;
-      const iconY = buttonY;
+      // 큰 투명 클릭 영역 - x축 텍스트 영역 전체를 커버
+      const clickAreaWidth = xScale.bandwidth();
+      const clickAreaHeight = 67.5; // 1.5배 더 긴 높이 (45 * 1.5 = 67.5)
+      const clickAreaX = xPos;
+      const clickAreaY = chartHeight - 5; // 차트 바로 아래부터 시작
       
-      const checkboxIcon = buttonGroup.append('rect')
-        .attr('class', 'country-checkbox-icon')
-        .attr('x', iconX)
-        .attr('y', iconY)
-        .attr('width', iconSize)
-        .attr('height', iconSize)
-        .attr('fill', isSelected ? '#2196F3' : 'white')
-        .attr('stroke', isSelected ? '#2196F3' : '#999')
-        .attr('stroke-width', 1)
-        .attr('rx', 2);
-      
-      // 선택되었을 때 체크마크 추가
-      if (isSelected) {
-        buttonGroup.append('text')
-          .attr('class', 'country-checkbox-checkmark')
-          .attr('x', iconX + iconSize / 2)
-          .attr('y', iconY + iconSize / 2 + 2)
-          .attr('text-anchor', 'middle')
-          .style('font-size', '7px')
-          .style('font-weight', '900')
-          .style('fill', 'white')
-          .style('pointer-events', 'none')
-          .text('✓');
-      }
+      const clickArea = buttonGroup.append('rect')
+        .attr('class', 'country-click-area')
+        .attr('x', clickAreaX)
+        .attr('y', clickAreaY)
+        .attr('width', clickAreaWidth)
+        .attr('height', clickAreaHeight)
+        .attr('fill', 'transparent') // 완전히 투명
+        .attr('stroke', 'none'); // 테두리 없음
       
       // 이벤트 핸들러
       buttonGroup
@@ -712,20 +659,20 @@ const World = ({
               toggleCountrySelection(country.country);
             }
           } else {
-            // 드래그 중이 아닐 때 호버 효과 - 체크박스 강조
-            checkboxIcon.attr('stroke-width', 2);
+            // 드래그 중이 아닐 때 호버 효과 - 클릭 영역에 약간의 배경색 표시
+            clickArea.attr('fill', 'rgba(33, 150, 243, 0.1)');
           }
         })
         .on('mouseleave', function(event) {
           if (!isDraggingRef.current) {
             // 호버 효과 초기화
-            checkboxIcon.attr('stroke-width', 1);
+            clickArea.attr('fill', 'transparent');
           }
         });
     });
     
     // 모두 선택 / 모두 해제 버튼 추가
-    const buttonY = chartHeight + 55; // 체크박스 아래에 위치
+    const buttonY = chartHeight + 77; // 더 아래로 이동 (55 + 22 = 77)
     const buttonGroup = chartGroup.append('g')
       .attr('class', 'bulk-action-buttons');
     
@@ -735,9 +682,9 @@ const World = ({
       .style('cursor', 'pointer');
     
     selectAllButton.append('rect')
-      .attr('x', chartWidth / 2 - 60)
+      .attr('x', chartWidth / 2 - 80)
       .attr('y', buttonY)
-      .attr('width', 50)
+      .attr('width', 70)
       .attr('height', 20)
       .attr('fill', 'rgba(255, 255, 255, 0.9)')
       .attr('stroke', '#2196F3')
@@ -745,14 +692,14 @@ const World = ({
       .attr('rx', 4);
     
     selectAllButton.append('text')
-      .attr('x', chartWidth / 2 - 35)
+      .attr('x', chartWidth / 2 - 45)
       .attr('y', buttonY + 13)
       .attr('text-anchor', 'middle')
-      .style('font-size', '9px')
+      .style('font-size', '10px')
       .style('font-weight', '500')
       .style('fill', '#2196F3')
       .style('pointer-events', 'none')
-      .text('Select All');
+      .text('전체 선택');
     
     // 모두 해제 버튼
     const clearAllButton = buttonGroup.append('g')
@@ -762,7 +709,7 @@ const World = ({
     clearAllButton.append('rect')
       .attr('x', chartWidth / 2 + 10)
       .attr('y', buttonY)
-      .attr('width', 50)
+      .attr('width', 70)
       .attr('height', 20)
       .attr('fill', 'rgba(255, 255, 255, 0.9)')
       .attr('stroke', '#f44336')
@@ -770,14 +717,14 @@ const World = ({
       .attr('rx', 4);
     
     clearAllButton.append('text')
-      .attr('x', chartWidth / 2 + 35)
+      .attr('x', chartWidth / 2 + 45)
       .attr('y', buttonY + 13)
       .attr('text-anchor', 'middle')
-      .style('font-size', '9px')
+      .style('font-size', '10px')
       .style('font-weight', '500')
       .style('fill', '#f44336')
       .style('pointer-events', 'none')
-      .text('Clear All');
+      .text('전체 선택 해제');
     
     // 이벤트 핸들러 추가
     selectAllButton
@@ -912,7 +859,7 @@ const World = ({
         d3.select(tooltipRef.current).style('opacity', 0);
       }
     }
-  }, [currentYear, getCountryData, selectedCountries, isDragging, dragMode]);
+  }, [currentYear, getCountryData, selectedCountries, isDragging, dragMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleMouseOver = (event, d) => {
     const mapCountryName = d.properties.name;
@@ -1280,9 +1227,9 @@ const World = ({
       if (tooltipRef.current) {
         d3.select(tooltipRef.current).style('opacity', 0);
       }
-    }
-      
-  }, [currentYear, selectedCountries, countriesData, tooltipRef]);
+          }
+        
+  }, [currentYear, selectedCountries, countriesData, tooltipRef]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Draw global trend chart
   const drawTrendChart = useCallback(() => {
@@ -1514,7 +1461,7 @@ const World = ({
       });
     
     // 현재 연도 선 추가
-    const currentYearLine = chartGroup.append('line')
+    chartGroup.append('line')
       .attr('class', 'current-year-line')
       .attr('x1', xScale(currentYear))
       .attr('x2', xScale(currentYear))
@@ -1648,7 +1595,7 @@ const World = ({
     }, 100);
     
     return () => clearTimeout(timer);
-  }, [currentYear]);
+  }, [currentYear]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 국가 선택 토글
   const toggleCountrySelection = useCallback((countryName) => {
@@ -1721,32 +1668,45 @@ const World = ({
       
       <div id="upper-right-panel">
         <div style={{ padding: '10px', height: '100%', display: 'flex', flexDirection: 'column' }}>
-          <div style={{ marginBottom: '10px', textAlign: 'center' }}>
+          <div style={{ marginBottom: '15px', textAlign: 'center' }}>
             <h4 style={{ margin: '0 0 5px 0', fontSize: '14px', color: '#333' }}>
               Country Comparison
             </h4>
-            <div style={{ fontSize: '11px', color: '#666', marginBottom: '5px' }}>
-              Click or drag + buttons below countries to compare
-            </div>
             {selectedCountries.length > 0 && (
-              <button 
-                onClick={() => setSelectedCountries([])}
-                style={{
-                  fontSize: '10px',
-                  padding: '4px 8px',
-                  background: '#f44336',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '3px',
-                  cursor: 'pointer'
-                }}
-              >
-                Clear All ({selectedCountries.length})
-              </button>
+              <>
+                <div style={{ fontSize: '11px', color: '#666', marginBottom: '5px' }}>
+                  선택된 국가들의 비교 차트
+                </div>
+                <button 
+                  onClick={() => setSelectedCountries([])}
+                  style={{
+                    fontSize: '10px',
+                    padding: '4px 8px',
+                    background: '#f44336',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '3px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  전체 선택 해제 ({selectedCountries.length})
+                </button>
+              </>
             )}
           </div>
           <div style={{ flex: 1, position: 'relative' }}>
-            <svg ref={comparisonChartRef} style={{ width: '100%', height: '100%' }}></svg>
+            {selectedCountries.length === 0 ? (
+              <div style={{ height: '85%', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center' }}>
+                <div style={{ fontSize: '14px', color: '#666', lineHeight: '1.6', maxWidth: '300px' }}>
+                  <div style={{ marginBottom: '12px', fontWeight: '500', fontSize: '18px' }}>📊 사용 방법</div>
+                  <div style={{ marginBottom: '8px' }}>• 막대 그래프에서 국가명을 클릭하여 비교할 국가 선택</div>
+                  <div style={{ marginBottom: '8px' }}>• 여러 국가를 드래그하여 한 번에 선택/해제 가능</div>
+                  <div style={{ marginBottom: '8px' }}>• 마우스 커서를 차트 위에 올려서 정확한 데이터 확인</div>
+                </div>
+              </div>
+            ) : (
+              <svg ref={comparisonChartRef} style={{ width: '100%', height: '100%' }}></svg>
+            )}
           </div>
         </div>
       </div>

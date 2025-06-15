@@ -77,12 +77,12 @@ const Korea = ({
     drawKoreaPieChart();
     drawKoreaLineChart();
     drawKoreaStackedChart();
-  }, [currentYear, selectedEnergySource]);
+  }, [currentYear, selectedEnergySource]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Needed Energy Pie Chart - 실시간 업데이트
   useEffect(() => {
     updateNeededEnergyPie();
-  }, [energyMixPercentages]);
+  }, [energyMixPercentages]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const drawKoreaSmallMap = () => {
     if (!koreaSmallMapRef.current) return;
@@ -319,11 +319,13 @@ const Korea = ({
         .attr('d', line);
     });
     
-    // 범례
+    // 범례 - 생산, 소비, 수입
     const legend = svg.append('g')
       .attr('transform', `translate(${viewBoxWidth - margin.right + 5}, ${margin.top + 5})`);
     
-    Object.keys(labels).forEach((key, i) => {
+    const legendOrder = ['production', 'consumption', 'imports'];
+    
+    legendOrder.forEach((key, i) => {
       const legendItem = legend.append('g')
         .attr('transform', `translate(0, ${i * 20})`);
       
@@ -351,41 +353,41 @@ const Korea = ({
       .style('fill', 'none')
       .style('pointer-events', 'all');
     
-    const focus = g.append('g')
-      .attr('class', 'focus')
-      .style('display', 'none');
-    
-    focus.append('line')
-      .attr('class', 'x-hover-line hover-line')
-      .attr('y1', 0)
-      .attr('y2', height)
-      .style('stroke', '#666')
-      .style('stroke-width', 1)
-      .style('stroke-dasharray', '3,3')
-      .style('opacity', 0.8);
-    
-    Object.keys(lineData).forEach((key, index) => {
-      const circle = focus.append('circle')
-        .attr('class', `circle-${key}`)
-        .attr('r', 4)
-        .style('fill', colors[key])
-        .style('stroke', 'white')
-        .style('stroke-width', 2);
+          const focus = g.append('g')
+        .attr('class', 'focus')
+        .style('display', 'none');
       
-      // Add background rectangle for text readability
-      const textBg = focus.append('rect')
-        .attr('class', `text-bg-${key}`)
-        .style('fill', 'rgba(255, 255, 255, 0.8)')
-        .style('stroke', 'none')
-        .attr('rx', 2);
+      focus.append('line')
+        .attr('class', 'x-hover-line hover-line')
+        .attr('y1', 0)
+        .attr('y2', height)
+        .style('stroke', '#666')
+        .style('stroke-width', 1)
+        .style('stroke-dasharray', '3,3')
+        .style('opacity', 0.8);
       
-      const text = focus.append('text')
-        .attr('class', `text-${key}`)
-        .style('font-size', '11px')
-        .style('font-weight', '600')
-        .style('fill', colors[key])
-        .style('text-anchor', 'middle');
-    });
+      Object.keys(lineData).forEach((key) => {
+        focus.append('circle')
+          .attr('class', `circle-${key}`)
+          .attr('r', 4)
+          .style('fill', colors[key])
+          .style('stroke', 'white')
+          .style('stroke-width', 2);
+        
+        // Add background rectangle for text readability
+        focus.append('rect')
+          .attr('class', `text-bg-${key}`)
+          .style('fill', 'rgba(255, 255, 255, 0.8)')
+          .style('stroke', 'none')
+          .attr('rx', 2);
+        
+        focus.append('text')
+          .attr('class', `text-${key}`)
+          .style('font-size', '11px')
+          .style('font-weight', '600')
+          .style('fill', colors[key])
+          .style('text-anchor', 'middle');
+      });
     
     const yearText = focus.append('text')
       .attr('class', 'year-text')
@@ -424,7 +426,6 @@ const Korea = ({
        }).filter(d => d !== null).sort((a, b) => b.value - a.value);
        
        // 레이블 중복 방지를 위한 위치 계산
-       const labelHeight = 15;
        const minLabelSpacing = 18;
        const positions = [];
        
@@ -620,7 +621,7 @@ const Korea = ({
       .range(colors);
     
     // 데이터 바들 먼저 그리기
-    const dataRects = g.append('g')
+    g.append('g')
       .attr('class', 'data-rects')
       .selectAll('g')
       .data(stackedData)
@@ -1133,7 +1134,6 @@ const Korea = ({
                   const fixedCount = Object.values(fixedSliders).filter(Boolean).length;
                   const isFixed = fixedSliders[type];
                   const isDisabled = isFixed || (fixedCount >= 3 && !isFixed);
-                  const maxValue = getSliderMaxValue(type);
                   
                   return (
                     <div key={type} className="slider-group">
@@ -1192,8 +1192,19 @@ const Korea = ({
               </div>
             </div>
             
-            <div className="budget-result">
-              <h4>Needed Energy Budget: <span id="calculated-budget">{calculateBudget()}억</span> KRW</h4>
+            <div style={{ marginTop: '10px' }}>
+              <div style={{ 
+                fontSize: '10px', 
+                color: '#888', 
+                textAlign: 'center', 
+                marginBottom: '5px',
+                fontStyle: 'italic'
+              }}>
+                * 2024년 기준 에너지원별 평균 단가 적용
+              </div>
+              <div className="budget-result">
+                <h4>Needed Energy Budget: <span id="calculated-budget">{calculateBudget()}억</span> KRW</h4>
+              </div>
             </div>
           </div>
         </div>

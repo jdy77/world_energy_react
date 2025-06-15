@@ -254,6 +254,46 @@
     min-height: calc(100vh - 70px);
     padding-top: 70px;
     padding-bottom: 70px;
+    opacity: 0;
+    animation: fadeIn 0.6s ease-in-out forwards;
+  }
+  
+  /* Fade-in animation */
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  /* Fade-out animation */
+  @keyframes fadeOut {
+    from {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    to {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+  }
+  
+  /* Animation classes for transitions */
+  .view-container.fade-in {
+    animation: fadeIn 0.6s ease-in-out forwards;
+  }
+  
+  .view-container.fade-out {
+    animation: fadeOut 0.4s ease-in-out forwards;
+  }
+  
+  /* Ensure proper visibility during transitions */
+  .view-container.transitioning {
+    opacity: 0;
   }
   
   /* World view maintains flexible height */
@@ -814,55 +854,114 @@
     gap: 2px;
     margin-top: 5px;
     cursor: pointer;
-    opacity: 0.7;
-    transition: opacity 0.2s ease;
+    opacity: 0.85;
+    transition: all 0.3s ease;
+    border-radius: 6px;
+    padding: 4px 8px;
+    margin-left: -8px; /* Offset the padding to maintain alignment */
+    user-select: none;
+    position: relative;
   }
   
   .info-icon-container:hover {
     opacity: 1;
+    transform: translateY(-1px);
   }
   
   .info-icon {
     flex-shrink: 0;
     width: 10px !important;
     height: 10px !important;
+    transition: all 0.3s ease;
   }
   
   .info-text {
     font-size: 11px;
     color: #888888;
     font-weight: normal;
+    transition: all 0.3s ease;
+    white-space: nowrap;
   }
   
-  /* Info icon glow styles (without animation) */
+  /* Info icon glow styles (enhanced for better visibility) */
   .info-icon-container.glow {
     opacity: 1;
+    background: rgba(46, 134, 222, 0.08);
+    padding: 4px 8px;
+    border-radius: 6px;
+    border: 1px solid rgba(46, 134, 222, 0.2);
+    transition: all 0.3s ease;
+    cursor: pointer;
+    position: relative;
+  }
+
+  .info-icon-container.glow::before {
+    content: '';
+    position: absolute;
+    top: -2px;
+    left: -2px;
+    right: -2px;
+    bottom: -2px;
+    background: linear-gradient(45deg, rgba(46, 134, 222, 0.3), rgba(46, 134, 222, 0.1));
+    border-radius: 8px;
+    z-index: -1;
+    opacity: 0.6;
+    animation: subtle-pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes subtle-pulse {
+    0%, 100% { opacity: 0.3; transform: scale(1); }
+    50% { opacity: 0.6; transform: scale(1.02); }
+  }
+
+  .info-icon-container.glow:hover {
+    background: rgba(46, 134, 222, 0.12);
+    border-color: rgba(46, 134, 222, 0.4);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(46, 134, 222, 0.2);
   }
 
   .info-icon-container.glow .info-text {
     color: #2e86de;
     font-weight: 600;
+    text-shadow: 0 0 2px rgba(46, 134, 222, 0.3);
   }
 
   .info-icon-container.glow .info-icon path {
     fill: #2e86de;
+    filter: drop-shadow(0 0 2px rgba(46, 134, 222, 0.4));
   }
 
   /* Clicked state - no glow, subtle highlight on hover */
   .info-icon-container.clicked {
-    opacity: 0.6;
+    opacity: 0.9;
+    background: transparent;
+    padding: 4px 8px;
+    border-radius: 6px;
+    border: 1px solid transparent;
+    transition: all 0.3s ease;
+    cursor: pointer;
+  }
+
+  .info-icon-container.clicked::before {
+    display: none;
   }
 
   .info-icon-container.clicked:hover {
     opacity: 0.8;
+    background: rgba(136, 136, 136, 0.05);
+    border-color: rgba(136, 136, 136, 0.2);
   }
 
   .info-icon-container.clicked .info-text {
     color: #666;
+    font-weight: normal;
+    text-shadow: none;
   }
 
   .info-icon-container.clicked .info-icon path {
     fill: #666;
+    filter: none;
   }
   
   /* Current year indicator styles */
